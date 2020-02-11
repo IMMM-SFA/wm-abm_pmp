@@ -13,10 +13,10 @@ try:
 except ImportError:  # python 3.x
     import pickle
 
-with open('water_constraints_by_farm_v2.p', 'wb') as fp:
-    pickle.dump(water_constraints_by_farm_2, fp, protocol=pickle.HIGHEST_PROTOCOL)
+with open('result_xs.p', 'wb') as fp:
+    pickle.dump(result_xs, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open('crop_ids_by_farm.p', 'rb') as fp:
+with open('result_xs.p', 'rb') as fp:
     test = pickle.load(fp)
 
 
