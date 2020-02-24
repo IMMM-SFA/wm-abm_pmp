@@ -13,10 +13,10 @@ try:
 except ImportError:  # python 3.x
     import pickle
 
-with open('result_xs.p', 'wb') as fp:
-    pickle.dump(result_xs, fp, protocol=pickle.HIGHEST_PROTOCOL)
+with open('net_prices.p', 'wb') as fp:
+    pickle.dump(net_prices, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open('result_xs.p', 'rb') as fp:
+with open('gammas.p', 'rb') as fp:
     test = pickle.load(fp)
 
 

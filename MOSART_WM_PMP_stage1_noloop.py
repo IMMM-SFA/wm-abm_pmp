@@ -170,30 +170,38 @@ result_xs = dict(fwm_s.xs.get_values())
 
 # JY results stored as pickle file (results_xs.p). Start here and load pickle files.
 with open('result_xs.p', 'rb') as fp:
-    test = pickle.load(fp)
+    result_xs = pickle.load(fp)
 
-## D.2. Storing derived model outputs:
-df_output=pd.DataFrame(index=range(0,(sd_no*crop_no)),columns=["subdistrict","crop","land_use","irrigation","profit",
-                                                                 "alpha","gamma","land_ratio_to_obs"])
-df_output_mth=pd.DataFrame(index=range(1,1+(sd_no*12*crop_no)),columns=["subdistrict","month","crop","land_use","irrigation","profit",
-                                                                        "alpha","gamma"])
+# JY store results into a pandas dataframe
+results_pd = data_profit
+results_pd = results_pd.assign(calc_area=result_xs.values())
+results_pd = results_pd.assign(nir=nirs.values())
+results_pd['calc_water_demand'] = results_pd['calc_area'] * results_pd['nir']
+results_pivot = pd.pivot_table(results_pd, index=['nldas'], values=['calc_water_demand'], aggfunc=np.sum)
 
-#JY this look takes forever! Replace!
-i=1
-for sd in range(sd_no):
-    for crp in range(crop_no):
-        crop_id=crop_ids_by_farm[sd][crp]
-        current_land_use=result_xs[crop_id] if result_xs[crop_id] else 0.0
-        current_water_use=current_land_use*water_nirs[crop_id]
-        current_profit=current_land_use*(net_prices[crop_id]+alphas[crop_id])
-        current_alpha1=alpha1[crop_id]
-        current_gamma1=gamma1[crop_id]
-        land_ratio_to_obs = (current_land_use / obs_lu[crop_id]) if (obs_lu[crop_id] > 0.0) else int(obs_lu[crop_id] == round(current_land_use,0))
-        df_output.loc[crop_id]=[farm_ids[sd],crop_types[crp],current_land_use,current_water_use,current_profit,
-                                current_alpha1,current_gamma1,land_ratio_to_obs]
-        for mth in range(1,13):
-            #water_percent=float(data_seasons["water_percent"][(data_seasons["crop"]==crop_types[crp])&(data_seasons["month"]==mth)]) ##JY identify monthly variation of water use by crop
-            current_water_use_mth=current_water_use / 12.0
-            df_output_mth.loc[i]=[farm_ids[sd],mth,crop_types[crp],current_land_use,current_water_use_mth,current_profit,
-                                  current_alpha1,current_gamma1]
-            i+=1
+
+# ## D.2. Storing derived model outputs:
+# df_output=pd.DataFrame(index=range(0,(sd_no*crop_no)),columns=["subdistrict","crop","land_use","irrigation","profit",
+#                                                                  "alpha","gamma","land_ratio_to_obs"])
+# df_output_mth=pd.DataFrame(index=range(1,1+(sd_no*12*crop_no)),columns=["subdistrict","month","crop","land_use","irrigation","profit",
+#                                                                         "alpha","gamma"])
+
+# #JY this look takes forever! Replace!
+# i=1
+# for sd in range(sd_no):
+#     for crp in range(crop_no):
+#         crop_id=crop_ids_by_farm[sd][crp]
+#         current_land_use=result_xs[crop_id] if result_xs[crop_id] else 0.0
+#         current_water_use=current_land_use*water_nirs[crop_id]
+#         current_profit=current_land_use*(net_prices[crop_id]+alphas[crop_id])
+#         current_alpha1=alpha1[crop_id]
+#         current_gamma1=gamma1[crop_id]
+#         land_ratio_to_obs = (current_land_use / obs_lu[crop_id]) if (obs_lu[crop_id] > 0.0) else int(obs_lu[crop_id] == round(current_land_use,0))
+#         df_output.loc[crop_id]=[farm_ids[sd],crop_types[crp],current_land_use,current_water_use,current_profit,
+#                                 current_alpha1,current_gamma1,land_ratio_to_obs]
+#         for mth in range(1,13):
+#             #water_percent=float(data_seasons["water_percent"][(data_seasons["crop"]==crop_types[crp])&(data_seasons["month"]==mth)]) ##JY identify monthly variation of water use by crop
+#             current_water_use_mth=current_water_use / 12.0
+#             df_output_mth.loc[i]=[farm_ids[sd],mth,crop_types[crp],current_land_use,current_water_use_mth,current_profit,
+#                                   current_alpha1,current_gamma1]
+#             i+=1
