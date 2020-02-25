@@ -17,6 +17,8 @@ import pdb
 data_file=pd.ExcelFile("MOSART_WM_PMP_inputs_test.xlsx")
 data_profit = data_file.parse("Profit")
 data_constraint = data_file.parse("Constraint")
+water_nirs=data_profit["nir_corrected"]
+nirs=dict(water_nirs)
 
 nldas_ids=data_profit["nldas"][0:53835].tolist()
 

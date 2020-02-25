@@ -13,8 +13,8 @@ try:
 except ImportError:  # python 3.x
     import pickle
 
-with open('net_prices.p', 'wb') as fp:
-    pickle.dump(net_prices, fp, protocol=pickle.HIGHEST_PROTOCOL)
+with open('nldas_ids.p', 'wb') as fp:
+    pickle.dump(nldas_ids, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 with open('gammas.p', 'rb') as fp:
     test = pickle.load(fp)
