@@ -30,13 +30,13 @@ crop_ids_by_farm_and_constraint={}
 land_constraints_by_farm={}
 water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
-with open('crop_ids_by_farm.p', 'rb') as fp:
+with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('land_constraints_by_farm.p', 'rb') as fp:
+with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp)
-with open('water_constraints_by_farm_v2.p', 'rb') as fp:
+with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp)
-with open('crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
 
 water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)

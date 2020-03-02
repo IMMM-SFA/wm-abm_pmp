@@ -13,15 +13,15 @@ import netCDF4
 
 def calc_demand(year, month):
     if int(month) == 1:
-        with open('nldas_ids.p', 'rb') as fp:
+        with open('data_inputs/nldas_ids.p', 'rb') as fp:
             nldas_ids = pickle.load(fp)
 
-        nldas = pd.read_csv('nldas.txt')
+        nldas = pd.read_csv('data_inputs/nldas.txt')
 
         year_int = int(year)
         months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
-        with open('water_constraints_by_farm_v2.p', 'rb') as fp:
+        with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
             water_constraints_by_farm = pickle.load(fp)
         water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 
@@ -29,13 +29,16 @@ def calc_demand(year, month):
         if year_int==2000:
             pass
         else:
-            os.chdir('/pic/scratch/yoon644/csmruns/jimtest2/run/')
+
+            #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
+            pic_input_dir = 'pic_input_test/'
 
             # loop through .nc files and extract data
             first = True
             for m in months:
-                dataset_name = 'jim_abm_integration.mosart.h0.' + str(year-1) + '-' + m + '.nc'
-                ds = xr.open_dataset(dataset_name)
+                #dataset_name = 'jim_abm_integration.mosart.h0.' + str(year-1) + '-' + m + '.nc'
+                dataset_name = 'statemod.mosart.h0.' + str(year_int - 1) + '-' + m + '.nc'
+                ds = xr.open_dataset(pic_input_dir+dataset_name)
                 df = ds.to_dataframe()
                 df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
                 df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT']]
@@ -58,7 +61,7 @@ def calc_demand(year, month):
             water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft'].to_dict()
 
         ## Read in PMP calibration files
-        data_file=pd.ExcelFile("MOSART_WM_PMP_inputs_v1.xlsx")
+        data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
         data_profit = data_file.parse("Profit")
         water_nirs=data_profit["nir_corrected"]
         nirs=dict(water_nirs)
@@ -66,17 +69,17 @@ def calc_demand(year, month):
         ## C.1. Preparing model indices and constraints:
         ids = range(592185) # total number of crop and nldas ID combinations
         farm_ids = range(53835) # total number of farm agents / nldas IDs
-        with open('crop_ids_by_farm.p', 'rb') as fp:
+        with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
             crop_ids_by_farm = pickle.load(fp)
-        with open('crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+        with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
             crop_ids_by_farm_and_constraint = pickle.load(fp)
-        with open('land_constraints_by_farm.p', 'rb') as fp:
+        with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
             land_constraints_by_farm = pickle.load(fp)
 
         # Load gammas and alphas
-        with open('gammas.p', 'rb') as fp:
+        with open('data_inputs/gammas.p', 'rb') as fp:
             gammas = pickle.load(fp)
-        with open('net_prices.p', 'rb') as fp:
+        with open('data_inputs/net_prices.p', 'rb') as fp:
             net_prices = pickle.load(fp)
 
         x_start_values=dict(enumerate([0.0]*3))
@@ -125,10 +128,8 @@ def calc_demand(year, month):
         results_pd['calc_water_demand'] = results_pd['calc_area'] * results_pd['nir']
         results_pivot = pd.pivot_table(results_pd, index=['nldas'], values=['calc_water_demand'], aggfunc=np.sum) #JY demand is order of magnitude low, double check calcs
 
-        file = 'RCP8.5_GCAM_water_demand_1980_01_copy.nc'
-
         # read a sample water demand input file
-        file = 'RCP8.5_GCAM_water_demand_1980_01_copy.nc'
+        file = 'data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
         with netCDF4.Dataset(file, 'r') as nc:
             # for key, var in nc.variables.items():
             #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
@@ -138,7 +139,7 @@ def calc_demand(year, month):
             demand = nc['totalDemand'][:]
 
         # read NLDAS grid reference file
-        df_grid = pd.read_csv('NLDAS_Grid_Reference.csv')
+        df_grid = pd.read_csv('data_inputs/NLDAS_Grid_Reference.csv')
 
         df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
 
@@ -160,7 +161,7 @@ def calc_demand(year, month):
 
         for month in months:
             str_year = str(year_int)
-            new_fname = 'abm_test_demand/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
+            new_fname = 'pic_output_test/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
             shutil.copyfile(file, new_fname)
             demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
             with netCDF4.Dataset(new_fname,'a') as nc:
