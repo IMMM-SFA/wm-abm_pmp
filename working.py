@@ -22,7 +22,7 @@ if int('01') == 1:
     months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
     with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
-        water_constraints_by_farm = pickle.load(fp)
+        water_constraints_by_farm = pickle.load(fp, encoding='latin1')
     water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 
     ## Read in Water Availability Files from MOSART-PMP
@@ -74,13 +74,13 @@ if int('01') == 1:
     with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
         crop_ids_by_farm_and_constraint = pickle.load(fp)
     with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
-        land_constraints_by_farm = pickle.load(fp)
+        land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 
     # Load gammas and alphas
     with open('data_inputs/gammas.p', 'rb') as fp:
-        gammas = pickle.load(fp)
+        gammas = pickle.load(fp, encoding='latin1')
     with open('data_inputs/net_prices.p', 'rb') as fp:
-        net_prices = pickle.load(fp)
+        net_prices = pickle.load(fp, encoding='latin1')
 
     x_start_values=dict(enumerate([0.0]*3))
 
@@ -154,7 +154,10 @@ if int('01') == 1:
 
     # use NLDAS_ID as index for both dataframes
     df_nc = df_nc.set_index('NLDAS_ID',drop=False)
-    results_pivot = results_pivot.set_index('nldas',drop=False)
+    try:
+        results_pivot = results_pivot.set_index('nldas',drop=False)
+    except KeyError:
+        pass
 
     # read ABM values into df_nc basing on the same index
     df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_water_demand.values
@@ -168,3 +171,19 @@ if int('01') == 1:
             nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 else:
     pass
+
+try:
+    results_pivot = results_pivot.set_index('nldas',drop=False)
+except KeyError:
+    pass
+
+# read ABM values into df_nc basing on the same index
+df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_water_demand.values
+
+for month in months:
+    str_year = str(year_int)
+    new_fname = 'pic_output_test/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
+    shutil.copyfile(file, new_fname)
+    demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
+    with netCDF4.Dataset(new_fname,'a') as nc:
+        nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
