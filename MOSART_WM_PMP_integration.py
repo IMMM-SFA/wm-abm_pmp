@@ -10,6 +10,9 @@ except ImportError:  # python 3.x
     import pickle
 import shutil
 import netCDF4
+import logging
+
+logging.basicConfig(filename='app.log',level=logging.INFO)
 
 def calc_demand(year, month):
     if int(month) == 1:

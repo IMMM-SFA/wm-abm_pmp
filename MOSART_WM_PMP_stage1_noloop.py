@@ -3,8 +3,8 @@ import sys
 global basepath
 print(os.path.dirname(sys.argv[0]))
 ##basepath = os.path.dirname(sys.argv[0]).split(__file__)[0]
-from pyomo.environ import *
-from pyomo.opt import SolverFactory
+# from pyomo.environ import *
+# from pyomo.opt import SolverFactory
 import pandas as pd
 import numpy as np
 try:
@@ -14,7 +14,7 @@ except ImportError:  # python 3.x
 import pdb
 
 
-data_file=pd.ExcelFile("MOSART_WM_PMP_inputs_v1.xlsx")
+data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 data_profit = data_file.parse("Profit")
 data_constraint = data_file.parse("Constraint")
 

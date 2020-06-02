@@ -187,3 +187,92 @@ for month in months:
     demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
     with netCDF4.Dataset(new_fname,'a') as nc:
         nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
+
+with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
+    water_constraints_by_farm = pickle.load(fp, encoding='latin1')
+
+pd.to_pickle(water_constraints_by_farm,'water_constraints_by_farm_v2_pandas.p',protocol=0)
+test = pd.read_pickle('water_constraints_by_farm_v2_pandas.p')
+
+with open('/pic/projects/im3/wm/Jim/pmp_input_files/water_constraints_by_farm_v2.p', 'rb') as fp:
+    water_constraints_by_farm = pickle.load(fp, encoding='latin1')
+
+with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
+    water_constraints_by_farm = pickle.load(fp)
+
+import os
+import sys
+global basepath
+print(os.path.dirname(sys.argv[0]))
+#basepath = os.path.dirname(sys.argv[0]).split(__file__)[0]
+from pyomo.environ import *
+from pyomo.opt import SolverFactory
+import pandas as pd
+import numpy as np
+
+## A.1. Loading main model data:
+run_mode = int(input("Enter \"1\" for using PMP alpha and gamma values from the 1st stage calculated her, \"0\" for exogenous values:"))
+print("Run mode is: " + ("endogenous" if (run_mode == 1) else "exogenous") + " PMP alpha and gamma.")
+filename = "190918-PyomoPMP-2Stages-Inputs-1.xlsx"
+print("Input selected: " + filename)
+#filename_and_path=os.path.join(basepath, filename)
+data_file=pd.ExcelFile('190918-PyomoPMP-2Stages-Inputs-1.xlsx')
+data_profit = data_file.parse("Profit")
+data_constraints = data_file.parse("Constraints")
+#crop_types=["Barley","OtherVegW","OtherFld","Olive","OtherTrees","OtherVegS"]
+crop_types=[str(i) for i in list(pd.unique(data_profit["crop"]))]
+subdistricts=data_profit["subdistrict"][0:89].tolist()
+crop_no=len(crop_types)
+sd_no=len(subdistricts)
+
+## A.2. Loading post-processing data, etc.:
+data_seasons = data_file.parse("iCWDMNTH")
+data_seasons = data_file.parse("iCWDMNTH")
+gw_nirs=dict(data_profit["gw_nir"])
+
+
+## B.1. Preparing model indices and constraints:
+ids=range(534)
+farm_ids=range(89)
+binary_ids=range(2)
+crop_ids_by_farm=dict(enumerate([np.where(data_profit["subdistrict"]==subdistricts[i])[0].tolist() for i in range(89)]))
+
+nldas=data_profit["nldas"][0:53835].tolist()
+
+crop_ids_by_farm_and_constraint={}
+land_constraints_by_farm={}
+water_constraints_by_farm={}
+for i in range(53835):
+    crop_ids_by_farm_and_constraint[i]=np.where((data_profit["nldas"]==nldas[i]))[0].tolist()
+    constraint_ids=np.where((data_constraint["nldas"]==nldas[i]))[0]
+    #land_constraints_by_farm[i,su,rf]=float(data_constraints.iloc[constraint_ids]["land_constraint"])
+    water_constraints_by_farm[i]=float(data_constraint.iloc[constraint_ids]["water_constraint"])
+
+with open('water_constraints_by_farm_pyt278.p', 'wb') as handle:
+    pickle.dump(water_constraints_by_farm, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open('water_constraints_by_farm_pyt278.p', 'rb') as handle:
+    test = pickle.load(handle)
+
+with open('data_inputs/nldas_ids.p', 'rb') as fp:
+    nldas_ids = pickle.load(fp)
+
+nldas = pd.read_csv('data_inputs/nldas.txt')
+
+with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
+    water_constraints_by_farm = pickle.load(fp)
+
+with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
+    crop_ids_by_farm = pickle.load(fp)
+
+with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+    crop_ids_by_farm_and_constraint = pickle.load(fp)
+
+with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
+    land_constraints_by_farm = pickle.load(fp)
+
+with open('data_inputs/gammas.p', 'rb') as fp:
+    gammas = pickle.load(fp)
+
+with open('data_inputs/net_prices.p', 'rb') as fp:
+    net_prices = pickle.load(fp)
