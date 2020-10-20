@@ -3,8 +3,8 @@ import sys
 global basepath
 print(os.path.dirname(sys.argv[0]))
 ##basepath = os.path.dirname(sys.argv[0]).split(__file__)[0]
-# from pyomo.environ import *
-# from pyomo.opt import SolverFactory
+from pyomo.environ import *
+from pyomo.opt import SolverFactory
 import pandas as pd
 import numpy as np
 try:
@@ -14,14 +14,16 @@ except ImportError:  # python 3.x
 import pdb
 
 
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
+#data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
+data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
 data_profit = data_file.parse("Profit")
-data_constraint = data_file.parse("Constraint")
+#data_constraint = data_file.parse("Constraint")
 
 nldas_ids=data_profit["nldas"][0:53835].tolist()
 
 ## B.1. Preparing model indices and constraints:
-ids = range(592185) # total number of crop and nldas ID combinations
+#ids = range(592185) # total number of crop and nldas ID combinations
+ids = range(538350) # total number of crop and nldas ID combinations
 farm_ids = range(53835) # total number of farm agents / nldas IDs
 sd_no = len(farm_ids)
 crop_types=[str(i) for i in list(pd.unique(data_profit["crop"]))]
@@ -32,12 +34,19 @@ water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
 with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
-    land_constraints_by_farm = pickle.load(fp)
+with open('data_inputs/max_land_constr.p', 'rb') as fp:
+    land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
-    water_constraints_by_farm = pickle.load(fp)
+    water_constraints_by_farm = pickle.load(fp, encoding='latin1')
 with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
+
+#Revise to account for removal of "Fodder_Herb category"
+crop_ids_by_farm_new = {}
+for i in crop_ids_by_farm:
+    crop_ids_by_farm_new[i] = crop_ids_by_farm[i][0:10]
+crop_ids_by_farm = crop_ids_by_farm_new
+crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
 water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 
@@ -49,6 +58,7 @@ water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 #     #land_constraints_by_farm[i]=data_constraint.iloc[constraint_ids]["land_constraint"].astype('float')
 #     water_constraints_by_farm_2[i]=data_constraint.iloc[constraint_ids]["water_constraint"].astype('float')
 
+# Replace NIRs with 0 value to 0.1 (nominal irrigation) to account for inconsistency between observed surface water irrigated area and NIR
 
 ## B.2. Preparing linear profit coefficients:
 prices=data_profit["price"]
@@ -78,7 +88,7 @@ fwm.gammas = Param(fwm.ids, initialize=gammas, mutable=True)
 fwm.land_constraints = Param(fwm.farm_ids, initialize=land_constraints_by_farm, mutable=True)
 fwm.water_constraints = Param(fwm.farm_ids, initialize=water_constraints_by_farm, mutable=True)
 fwm.xs = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
-obs_lu = dict(data_profit["area_irrigated"])
+obs_lu = dict(data_profit["area_irrigated_sw"])
 fwm.obs_lu = Param(fwm.ids, initialize=obs_lu, mutable=True)
 fwm.nirs = Param(fwm.ids, initialize=nirs, mutable=True)
 
