@@ -92,6 +92,7 @@ def calc_demand(year, month):
                 df_pivot['WRM_SUPPLY_acreft'] = df_pivot['WRM_SUPPLY'] * 60 * 60 * 24 * 30.42 * 12 / 1233.48
                 abm_supply_avail = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
                 mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
+                opt_factor = 1.1 # defines agent "optimism" factor
 
                 if year == '2001':
                     hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction.csv')
@@ -100,7 +101,7 @@ def calc_demand(year, month):
                     hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
 
                 abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])
-                abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])
+                abm_supply_avail['WRM_SUPPLY_acreft_updated'] = (((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])) * opt_factor
 
                 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
                 abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')

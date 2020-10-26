@@ -25,7 +25,7 @@ logging.info('Successfully loaded all Python modules')
 import pyutilib.subprocess.GlobalData
 pyutilib.subprocess.GlobalData.DEFINE_SIGNAL_HANDLERS_DEFAULT = False
 
-year = '2000'
+year = '2001'
 month = '01'
 
 logging.info(sys.version_info)
@@ -108,6 +108,12 @@ else:
 
 abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])
 abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])
+
+def apply_random(row):
+    update_random = np.random.normal(loc = row['WRM_SUPPLY_acreft_updated'], scale=1, size=(1))
+    return update_random[0]
+
+abm_supply_avail['WRM_SUPPLY_acreft_random'] = abm_supply_avail.apply(lambda row: apply_random(row), axis=1)
 
 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
 abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr']].to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_live.csv')

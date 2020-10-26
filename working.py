@@ -274,6 +274,7 @@ df5 = ds5.to_dataframe()
 ds6 = xr.open_dataset('C:\\Users\\yoon644\\Desktop\\USGS_irr_consumption_1999_08.nc')
 df6 = ds6.to_dataframe()
 
+mu = 0.2
 hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction.csv')
 hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
 abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])

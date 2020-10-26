@@ -6,21 +6,40 @@ import datetime
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-os.chdir('C:\\Users\\yoon644\\Desktop')
+os.chdir('C:\\Users\\yoon644\\Desktop\\ABM runs 2050')
+
+# Load in NLDAS/HUC-2 join table
+huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
+
+# Load in states/counties/regions join table
+states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 
 # Load in ABM csv results for cropped areas
-abm2000 = pd.read_csv('abm_results_2000.csv')
+abm = pd.read_csv('abm_results_2000')
+abm['year'] = 2000
 
-for year in range(6):
-    abm = pd.read_csv('abm_results_' + str(year+2000) + '.csv')
+for year in range(40):
+    abm = pd.read_csv('abm_results_' + str(year+2000))
     aggregation_functions = {'calc_area': 'sum'}
-    abm_summary = abm.groupby(['crop'], as_index=False).aggregate(aggregation_functions)
-    abm_summary.to_csv(str(year)+'.csv')
+    if year == 0:
+        abm = pd.merge(abm, huc2[['NLDAS_ID', 'NAME']], how='left',left_on='nldas',right_on='NLDAS_ID')
+        abm = pd.merge(abm, states_etc[['COUNTYFP','ERS_region','State','NLDAS_ID']],how='left',left_on='nldas',right_on='NLDAS_ID')
+        abm_detailed = abm
+        abm_detailed['year'] = year+2000
+        abm_summary = abm.groupby(['crop','NAME'], as_index=False).aggregate(aggregation_functions)
+        abm_summary['year'] = year+2000
+    else:
+        abm = pd.merge(abm, huc2[['NLDAS_ID', 'NAME']], how='left',left_on='nldas',right_on='NLDAS_ID')
+        abm = pd.merge(abm, states_etc[['COUNTYFP','ERS_region','State','NLDAS_ID']],how='left',left_on='nldas',right_on='NLDAS_ID')
+        abm['year'] = year + 2000
+        abm_detailed = abm_detailed.append(abm)
+        abm_summary_to_append = abm.groupby(['crop','NAME'], as_index=False).aggregate(aggregation_functions)
+        abm_summary_to_append['year'] = year+2000
+        abm_summary = abm_summary.append(abm_summary_to_append)
 
 abm2000_max = abm2000.loc[abm2000.groupby("nldas")["calc_area"].idxmax()]
 
 aggregation_functions = {'calc_area': 'sum', 'crop':''}
-aggregation_functions = {'cal'}
 
 # Output crop-specific csv for joining with shapefile in QGIS
 test2[(test2.crop=='Corn')].to_csv('corn_2000.csv')
