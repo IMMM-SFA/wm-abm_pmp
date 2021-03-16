@@ -77,7 +77,7 @@ for m in months:
     df = df.reset_index()
     df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
     logging.info('Successfully merged df for month, year: ' + month + ' ' + year)
-    df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT']]
+    df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT','WRM_STORAGE','GINDEX','RIVER_DISCHARGE_OVER_LAND_LIQ']]
     logging.info('Successfully subsetted df for month, year: ' + month + ' ' + year)
     df_select['year'] = year_int
     df_select['month'] = int(m)
@@ -89,34 +89,61 @@ for m in months:
     logging.info('Successfully concatenated df for month, year: ' + month + ' ' + year)
 
 # calculate average across timesteps
-df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID'], values=['WRM_SUPPLY'],
+# df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID','GINDEX'], values=['WRM_SUPPLY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ'],
+#                           aggfunc=np.mean)  # units will be average monthly (m3/s)
+df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID','GINDEX'], values=['WRM_SUPPLY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ'],
                           aggfunc=np.mean)  # units will be average monthly (m3/s)
 df_pivot = df_pivot.reset_index()
+df_pivot = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
+df_pivot.fillna(0)
 logging.info('Successfully pivoted df for month, year: ' + month + ' ' + year)
 
+# calculate dependent storage
+ds = xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\WM Flag Tests\\US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
+dams = ds["DamInd_2d"].to_dataframe()
+dams = dams.reset_index()
+dep = ds["gridID_from_Dam"].to_dataframe()
+dep = dep.reset_index()
+dep_id = ds["unit_ID"].to_dataframe()
+dep_merge = pd.merge(dep, dams, how='left', left_on=['Dams'], right_on=['DamInd_2d'])
+df_pivot = pd.merge(df_pivot, nldas, how='left', on='NLDAS_ID')
+dep_merge = pd.merge(dep_merge, df_pivot[['NLDAS_ID','CENTERX','CENTERY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ']], how='left', left_on=['lat','lon'], right_on=['CENTERY','CENTERX'])
+dep_merge['WRM_STORAGE'] = dep_merge['WRM_STORAGE'].fillna(0)
+
+aggregation_functions = {'WRM_STORAGE': 'sum'}
+dep_merge = dep_merge.groupby(['gridID_from_Dam'], as_index=False).aggregate(aggregation_functions)
+dep_merge.rename(columns={'WRM_STORAGE': 'STORAGE_SUM'}, inplace=True)
+
+wm_results = pd.merge(df_pivot, dep_merge, how='left', left_on=['GINDEX'], right_on=['gridID_from_Dam'])
+abm_supply_avail = wm_results[wm_results['NLDAS_ID'].isin(nldas_ids)].reset_index()
+abm_supply_avail = abm_supply_avail[['WRM_SUPPLY','NLDAS_ID','STORAGE_SUM','RIVER_DISCHARGE_OVER_LAND_LIQ']]
+abm_supply_avail = abm_supply_avail.fillna(0)
+
 # convert units from m3/s to acre-ft/yr
-df_pivot['WRM_SUPPLY_acreft'] = df_pivot['WRM_SUPPLY'] * 60 * 60 * 24 * 30.42 * 12 / 1233.48
-abm_supply_avail = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
 mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
 
-
 if year == '2001':
-    hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction.csv')
+    hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_20201102.csv')
     hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
 else:
     hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_live.csv')
 
-abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])
-abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])
+hist_storage = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_dependent_storage.csv')
+hist_avail_bias = pd.merge(hist_avail_bias, hist_storage, how='left', on='NLDAS_ID')
 
-def apply_random(row):
-    update_random = np.random.normal(loc = row['WRM_SUPPLY_acreft_updated'], scale=1, size=(1))
-    return update_random[0]
+abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
+abm_supply_avail['demand_factor'] = abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG']
+abm_supply_avail['demand_factor'] = np.where(abm_supply_avail['STORAGE_SUM_OG'] > 0, abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG'],
+                                             np.where(abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'] >= 0.1,
+                                                      abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ'] / abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'],
+                                                      1))
 
-abm_supply_avail['WRM_SUPPLY_acreft_random'] = abm_supply_avail.apply(lambda row: apply_random(row), axis=1)
+abm_supply_avail['WRM_SUPPLY_acreft_newinfo'] = abm_supply_avail['demand_factor'] * abm_supply_avail['WRM_SUPPLY_acreft_OG']
+
+abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft_newinfo'])
 
 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
-abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr']].to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_live.csv')
+abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor']].to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_live.csv')
 abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'] = abm_supply_avail['WRM_SUPPLY_acreft_updated'] + abm_supply_avail['sw_avail_bias_corr']
 water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
 logging.info('Successfully converted units df for month, year: ' + month + ' ' + year)

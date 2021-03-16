@@ -15,7 +15,8 @@ import pdb
 
 
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
+#data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
+data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201028.xlsx")
 data_profit = data_file.parse("Profit")
 #data_constraint = data_file.parse("Constraint")
 
@@ -34,7 +35,7 @@ water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
 with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('data_inputs/max_land_constr.p', 'rb') as fp:
+with open('data_inputs/max_land_constr_20201102.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp, encoding='latin1')

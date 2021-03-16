@@ -49,8 +49,10 @@ def calc_demand(year, month):
 
 
             ## Read in Water Availability Files from MOSART-PMP
-            if year_int==2000:
-                water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction.csv')
+            if year_int<1950:
+                pass
+            elif year_int==1950:
+                water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20201102.csv')
                 water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
                 water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
             else:
@@ -71,7 +73,7 @@ def calc_demand(year, month):
                     df = df.reset_index()
                     df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
                     logging.info('Successfully merged df for month, year: ' + month + ' ' + year)
-                    df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT']]
+                    df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT','WRM_STORAGE','GINDEX','RIVER_DISCHARGE_OVER_LAND_LIQ']]
                     logging.info('Successfully subsetted df for month, year: ' + month + ' ' + year)
                     df_select['year'] = year_int
                     df_select['month'] = int(m)
@@ -83,28 +85,61 @@ def calc_demand(year, month):
                     logging.info('Successfully concatenated df for month, year: ' + month + ' ' + year)
 
                 # calculate average across timesteps
-                df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID'], values=['WRM_SUPPLY'],
-                                          aggfunc=np.mean)  # units will be average monthly (m3/s)
+                # df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID','GINDEX'], values=['WRM_SUPPLY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ'],
+                #                           aggfunc=np.mean)  # units will be average monthly (m3/s)
+                df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID','GINDEX'], values=['WRM_SUPPLY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ'],
+                                                          aggfunc=np.mean)  # units will be average monthly (m3/s)
                 df_pivot = df_pivot.reset_index()
+                df_pivot = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
+                df_pivot.fillna(0)
                 logging.info('Successfully pivoted df for month, year: ' + month + ' ' + year)
 
-                # convert units from m3/s to acre-ft/yr
-                df_pivot['WRM_SUPPLY_acreft'] = df_pivot['WRM_SUPPLY'] * 60 * 60 * 24 * 30.42 * 12 / 1233.48
-                abm_supply_avail = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
-                mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
-                opt_factor = 1.1 # defines agent "optimism" factor
+                # calculate dependent storage
+                ds = xr.open_dataset('/pic/projects/im3/iwmm/input_data/runoff/US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
+                dams = ds["DamInd_2d"].to_dataframe()
+                dams = dams.reset_index()
+                dep = ds["gridID_from_Dam"].to_dataframe()
+                dep = dep.reset_index()
+                dep_id = ds["unit_ID"].to_dataframe()
+                dep_merge = pd.merge(dep, dams, how='left', left_on=['Dams'], right_on=['DamInd_2d'])
+                df_pivot = pd.merge(df_pivot, nldas, how='left', on='NLDAS_ID')
+                dep_merge = pd.merge(dep_merge, df_pivot[['NLDAS_ID','CENTERX','CENTERY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ']], how='left', left_on=['lat','lon'], right_on=['CENTERY','CENTERX'])
+                dep_merge['WRM_STORAGE'] = dep_merge['WRM_STORAGE'].fillna(0)
 
-                if year == '2001':
-                    hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction.csv')
+                aggregation_functions = {'WRM_STORAGE': 'sum'}
+                dep_merge = dep_merge.groupby(['gridID_from_Dam'], as_index=False).aggregate(aggregation_functions)
+                dep_merge.rename(columns={'WRM_STORAGE': 'STORAGE_SUM'}, inplace=True)
+
+                wm_results = pd.merge(df_pivot, dep_merge, how='left', left_on=['GINDEX'], right_on=['gridID_from_Dam'])
+                abm_supply_avail = wm_results[wm_results['NLDAS_ID'].isin(nldas_ids)].reset_index()
+                abm_supply_avail = abm_supply_avail[['WRM_SUPPLY','NLDAS_ID','STORAGE_SUM','RIVER_DISCHARGE_OVER_LAND_LIQ']]
+                abm_supply_avail = abm_supply_avail.fillna(0)
+
+                # convert units from m3/s to acre-ft/yr
+                mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
+
+                if year == '1981':
+                    hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20201102.csv')
                     hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
                 else:
                     hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
 
-                abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])
-                abm_supply_avail['WRM_SUPPLY_acreft_updated'] = (((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])) * opt_factor
+                hist_storage = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_dependent_storage.csv')
+                hist_avail_bias = pd.merge(hist_avail_bias, hist_storage, how='left', on='NLDAS_ID')
+
+                abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
+                abm_supply_avail['demand_factor'] = abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG']
+                abm_supply_avail['demand_factor'] = np.where(abm_supply_avail['STORAGE_SUM_OG'] > 0, abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG'],
+                                                             np.where(abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'] >= 0.1,
+                                                                      abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ'] / abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'],
+                                                                      1))
+
+                abm_supply_avail['WRM_SUPPLY_acreft_newinfo'] = abm_supply_avail['demand_factor'] * abm_supply_avail['WRM_SUPPLY_acreft_OG']
+
+                abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft_newinfo'])
 
                 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
-                abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
+                abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor','RIVER_DISCHARGE_OVER_LAND_LIQ_OG']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
                 abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'] = abm_supply_avail['WRM_SUPPLY_acreft_updated'] + abm_supply_avail['sw_avail_bias_corr']
                 water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
                 logging.info('Successfully converted units df for month, year: ' + month + ' ' + year)
@@ -112,7 +147,7 @@ def calc_demand(year, month):
             logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
 
             ## Read in PMP calibration files
-            data_file=pd.ExcelFile("/pic/projects/im3/wm/Jim/pmp_input_files/MOSART_WM_PMP_inputs_20201005.xlsx")
+            data_file=pd.ExcelFile("/pic/projects/im3/wm/Jim/pmp_input_files/MOSART_WM_PMP_inputs_20201028.xlsx")
             data_profit = data_file.parse("Profit")
             water_nirs=data_profit["nir_corrected"]
             nirs=dict(water_nirs)
@@ -126,7 +161,7 @@ def calc_demand(year, month):
                 crop_ids_by_farm = pickle.load(fp)
             with open('/pic/projects/im3/wm/Jim/pmp_input_files/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
                 crop_ids_by_farm_and_constraint = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/max_land_constr_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/max_land_constr_20201102_protocol2.p', 'rb') as fp:
                 land_constraints_by_farm = pickle.load(fp)
 
             # Revise to account for removal of "Fodder_Herb category"
@@ -137,9 +172,9 @@ def calc_demand(year, month):
             crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
             # Load gammas and alphas
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_new_20201013_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_new_20201102_protocol2.p', 'rb') as fp:
                 gammas = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_new_20201013_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_new_20201102_protocol2.p', 'rb') as fp:
                 net_prices = pickle.load(fp)
 
             # !JY! replace net_prices with zero value for gammas that equal to zero

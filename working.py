@@ -316,3 +316,85 @@ except KeyError:
 
 # read ABM values into df_nc basing on the same index
 df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_water_demand.values
+
+with open('net_prices_new_20201102.p', 'wb') as handle:
+    pickle.dump(net_prices, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open('max_land_constr_20201102_protocol2.p', 'wb') as handle:
+    pickle.dump(land_constraints_by_farm, handle, protocol=2)
+
+#############################
+import pandas as pd
+import xarray as xr
+import pickle
+
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+
+nldas = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_netcdf\\nldas.txt')
+
+with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\nldas_ids.p', 'rb') as fp:
+    nldas_ids = pickle.load(fp)
+
+ds = xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\WM Flag Tests\\US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
+dams = ds["DamInd_2d"].to_dataframe()
+dams = dams.reset_index()
+
+dep = ds["gridID_from_Dam"].to_dataframe()
+dep = dep.reset_index()
+dep_id = ds["unit_ID"].to_dataframe()
+
+dep_merge = pd.merge(dep, dams, how='left', left_on=['Dams'], right_on=['DamInd_2d'])
+
+ds = xr.open_dataset('C:\\Users\\yoon644\\Desktop\\wm_abm_run.mosart.h0.2000-01.nc')
+wm_results = ds[["WRM_STORAGE","WRM_DEMAND0","GINDEX","RIVER_DISCHARGE_OVER_LAND_LIQ"]].to_dataframe()
+wm_results = wm_results.reset_index()
+wm_results = pd.merge(wm_results, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
+wm_results = wm_results[wm_results['NLDAS_ID'].isin(nldas_ids)].reset_index()
+
+dep_merge = pd.merge(dep_merge, wm_results[['lat','lon','WRM_STORAGE']], how='left', left_on=['lat','lon'], right_on=['lat','lon'])
+
+aggregation_functions = {'WRM_STORAGE': 'sum'}
+dep_merge = dep_merge.groupby(['gridID_from_Dam'], as_index=False, dropna=False).aggregate(aggregation_functions)
+dep_merge.rename(columns={'WRM_STORAGE': 'STORAGE_SUM'}, inplace=True)
+
+wm_results = pd.merge(wm_results, dep_merge, how='left', left_on=['GINDEX'], right_on=['gridID_from_Dam'])
+abm_supply_avail = wm_results[wm_results['NLDAS_ID'].isin(nldas_ids)].reset_index()
+abm_supply_avail = abm_supply_avail[['NLDAS_ID','STORAGE_SUM']]
+abm_supply_avail = abm_supply_avail.fillna(0)
+
+#################
+
+data = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\JWP\\Figures\\alldata_hh_vulnerability_max_40.csv')
+data_subset = data[(data.intervention_name=='baseline') | (data.intervention_name=='demand management')]
+data_subset = data_subset[(data_subset.scenario_name=='growth') | (data_subset.scenario_name=='crisis')]
+data_subset = data_subset[(data_subset.year >= 2050)]
+#data_subset = data_subset[['name','date','year','month','income','represented_units','hnum','conseq_months_below_40_lcd','population','scenario_name','intervention_name']]
+data_subset = data_subset[['name','date','year','month','income','represented_units','hnum','piped','population','scenario_name','intervention_name']]
+data_subset = data_subset[['name','year','month','represented_units','hnum','piped','scenario_name','intervention_name']]
+
+import pandas as pd
+import numpy as np
+
+### Example shortage duration calc (currently post-processed in Tableau) for year 2099, demand management, population growth, low-income category
+
+# load in source data
+data_subset = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\JWP\\Figures\\data_for_CK.csv')
+
+# subset data
+data_example = data_subset[(data_subset.year == 2099)]
+data_example = data_example[(data_example.scenario_name == 'growth')]
+data_example = data_example[(data_example.intervention_name == 'demand management')]
+data_example = data_example[(data_example.income < 2412.3711340206196)] # cutoff between low and high income groups
+
+# revised shortage duration calc
+data_example['conseq_months_max_12'] = np.where(data_example['conseq_months_below_40_lcd'] > 12.0, 12.0, data_example['conseq_months_below_40_lcd']) # set the max consecutive months of shortage to 12
+data_example['conseq_months_max_12'] = data_example['conseq_months_below_40_lcd']
+
+# weight shortage duration calc by population for each agent
+data_example['weighted_shortage'] = data_example['conseq_months_max_12'] * data_example['population']
+
+# calculate avg population weighted shortage duration for entire subset
+weighted_shortage_calc = data_example.weighted_shortage.sum() / data_example.population.sum()
+
+# print result
+print(weighted_shortage_calc)
