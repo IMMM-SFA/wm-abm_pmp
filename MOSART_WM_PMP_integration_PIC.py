@@ -49,9 +49,11 @@ def calc_demand(year, month):
 
 
             ## Read in Water Availability Files from MOSART-PMP
-            if year_int<1950:
-                pass
-            elif year_int==1950:
+            if year_int<1950:  # If year is before 1950 (warm-up period), use the external baseline water demand files
+                water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20201102.csv') # Use baseline water demand data for warmup period
+                water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
+                water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
+            elif year_int==1950:  # For first year of ABM, use baseline water demand data
                 water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20201102.csv')
                 water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
                 water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
@@ -65,7 +67,7 @@ def calc_demand(year, month):
                 for m in months:
                     #dataset_name = 'jim_abm_integration.mosart.h0.' + str(year-1) + '-' + m + '.nc'
                     logging.info('Trying to load WM output for month, year: ' + month + ' ' + year)
-                    dataset_name = 'wm_abm_run.mosart.h0.' + str(year_int - 1) + '-' + m + '.nc' # currently assumes 1-year agent memory
+                    dataset_name = 'wm_abm_run.mosart.h0.' + str(year_int - 1) + '-' + m + '.nc'
                     logging.info('Successfully load WM output for month, year: ' + month + ' ' + year)
                     ds = xr.open_dataset(pic_input_dir+dataset_name)
                     df = ds.to_dataframe()
@@ -118,7 +120,7 @@ def calc_demand(year, month):
                 # convert units from m3/s to acre-ft/yr
                 mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
 
-                if year == '1981':
+                if year == '1951':
                     hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20201102.csv')
                     hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
                 else:
