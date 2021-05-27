@@ -398,3 +398,38 @@ weighted_shortage_calc = data_example.weighted_shortage.sum() / data_example.pop
 
 # print result
 print(weighted_shortage_calc)
+
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\ABM runs v7')
+df = pd.read_csv('abm_join_v7_sigmoidv3.csv')
+
+# Create new dataframe to sum areas for each nldas cell
+aggregation_functions = {'calc_area': 'sum'}
+abm_sum_area = abm.groupby(['nldas'], as_index=False).aggregate(aggregation_functions)
+abm_sum_area = abm_sum_area.rename(columns={"calc_area": "sum_area"})
+
+# Subset original dataframe by max crop for each nldas cell
+abm_max_crop = abm.sort_values('calc_area', ascending=False).drop_duplicates(['nldas'])
+
+# Merge two dataframes
+abm_merge = pd.merge(abm_sum_area, abm_max_crop[['nldas', 'crop','calc_area']], how='left',on='nldas')
+abm_merge['max_crop_perc'] = abm_merge['calc_area'] / abm_merge['sum_area']
+
+abm_summary = abm_merge
+abm_summary['year'] = 0 + 1950
+
+abm_next = pd.read_csv('abm_results_1951')
+abm_merge = pd.merge(abm_summary[['nldas','crop']], abm_next[['nldas', 'crop', 'calc_area']], how='left',on=['nldas','crop'])
+
+######
+
+# average area of grid cell (acres)
+36757.012506 * .25
+
+# group crop types for bump chart csv
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 corr')
+abm = pd.read_csv('abm_join_202104_mem02_corr.csv')
+abm = abm[(abm.Path==1)]
+abm = abm[(abm.PointOrdinal==1)]
+aggregation_functions = {'Total': 'sum'}
+abm_group = abm.groupby(['Year', 'Sub-category'], as_index=False).aggregate(aggregation_functions)
+abm_group.to_csv('abm_group_temp.csv')
