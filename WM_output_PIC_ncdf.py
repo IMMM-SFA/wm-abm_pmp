@@ -14,10 +14,11 @@ states_etc = pd.read_csv('/pic/projects/im3/wm/Jim/wm_abm_postprocess/nldas_stat
 
 months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
-for year in range(31):
+for year in range(70):
+    print(str(year))
     for m in months:
-        year_str = str(year+1980)
-        ds = xr.open_dataset('/pic/scratch/yoon644/csmruns/wm_abm_run/run/wm_abm_run.mosart.h0.' + year_str + '-' + m + '.nc')
+        year_str = str(year+1940)
+        ds = xr.open_dataset('/pic/scratch/yoon644/csmruns/wm_abm_run/run/previous_02_corr/wm_abm_run.mosart.h0.' + year_str + '-' + m + '.nc')
         df = ds.to_dataframe()
         df = df[['WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE']]
         df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
@@ -33,11 +34,11 @@ for year in range(31):
     if year == 0:
         aggregation_functions = {'WRM_SUPPLY': 'mean','WRM_DEMAND0': 'mean','RIVER_DISCHARGE_OVER_LAND_LIQ': 'mean','WRM_STORAGE': 'mean','NAME': 'first', 'State': 'first', 'ERS_region': 'first', 'COUNTYFP': 'first'}
         df_summary = df_append.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
-        df_summary['year'] = year+1980
+        df_summary['year'] = year+1940
     else:
         aggregation_functions = {'WRM_SUPPLY': 'mean','WRM_DEMAND0': 'mean','RIVER_DISCHARGE_OVER_LAND_LIQ': 'mean','WRM_STORAGE': 'mean','NAME': 'first', 'State': 'first', 'ERS_region': 'first', 'COUNTYFP': 'first'}
         df_summary_toappend = df_append.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
-        df_summary_toappend['year'] = year+1980
+        df_summary_toappend['year'] = year+1940
         df_summary = df_summary.append(df_summary_toappend)
 
 df_summary[['year','NLDAS_ID','WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE']].to_csv('wm_summary_results.csv')
