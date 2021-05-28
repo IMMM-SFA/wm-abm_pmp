@@ -16,7 +16,7 @@ import sys
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-logging.basicConfig(filename='C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\app.log',level=logging.INFO)
+logging.basicConfig(filename='/local_debug/app.log', level=logging.INFO)
 
 logging.info('Successfully loaded all Python modules')
 
@@ -34,10 +34,10 @@ logging.info(pd.__version__)
 logging.info('Trying to run ABM calc for month, year: ' + month + ' ' + year)
 logging.info('Entering month 1 calculations: ' + month)
 
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\nldas_ids.p', 'rb') as fp:
+with open('/local_debug/pmp_input_files_PIC_copy/nldas_ids.p', 'rb') as fp:
     nldas_ids = pickle.load(fp)
 
-nldas = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\nldas.txt')
+nldas = pd.read_csv('/local_debug/pmp_input_files_PIC_copy/nldas.txt')
 
 #!!!JY
 
@@ -45,7 +45,7 @@ nldas = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\
 year_int = int(year)
 months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\water_constraints_by_farm_pyt278.p', 'rb') as fp:
+with open('/local_debug/pmp_input_files_PIC_copy/water_constraints_by_farm_pyt278.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp)
 # water_constraints_by_farm = pd.read_pickle('/pic/projects/im3/wm/Jim/pmp_input_files/water_constraints_by_farm_v2.p')
 water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
@@ -54,7 +54,7 @@ water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 ## Read in Water Availability Files from MOSART-PMP
 
 ### !!! Run this section if testing first year (2000)
-water_constraints_by_farm = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\hist_avail_bias_correction.csv')
+water_constraints_by_farm = pd.read_csv('/local_debug/pmp_input_files_PIC_copy/hist_avail_bias_correction.csv')
 water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
 water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
 
@@ -62,7 +62,7 @@ water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_di
 
 ### !!! Run this section if testing after first year (2001 and beyond)
 #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
-pic_input_dir = 'C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\demand_input\\' #JY debug - need to modify for runs
+pic_input_dir = '/local_debug/demand_input\\'  #JY debug - need to modify for runs
 
 # loop through .nc files and extract data
 first = True
@@ -123,12 +123,12 @@ abm_supply_avail = abm_supply_avail.fillna(0)
 mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
 
 if year == '2001':
-    hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_20201102.csv')
+    hist_avail_bias = pd.read_csv('/data_inputs/hist_avail_bias_correction_20201102.csv')
     hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
 else:
-    hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction_live.csv')
+    hist_avail_bias = pd.read_csv('/data_inputs/hist_avail_bias_correction_live.csv')
 
-hist_storage = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_dependent_storage.csv')
+hist_storage = pd.read_csv('/data_inputs/hist_dependent_storage.csv')
 hist_avail_bias = pd.merge(hist_avail_bias, hist_storage, how='left', on='NLDAS_ID')
 
 abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
@@ -152,7 +152,7 @@ logging.info('Successfully converted units df for month, year: ' + month + ' ' +
 logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
 
 ## Read in PMP calibration files
-data_file=pd.ExcelFile("C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\MOSART_WM_PMP_inputs_20201005.xlsx")
+data_file=pd.ExcelFile("/data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
 data_profit = data_file.parse("Profit")
 water_nirs=data_profit["nir_corrected"]
 nirs=dict(water_nirs)
@@ -163,11 +163,11 @@ logging.info('I have successfully loaded PMP calibration files for month, year: 
 #ids = range(592185) # total number of crop and nldas ID combinations
 ids = range(538350) # total number of crop and nldas ID combinations
 farm_ids = range(53835) # total number of farm agents / nldas IDs
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\crop_ids_by_farm.p', 'rb') as fp:
+with open('/local_debug/pmp_input_files_PIC_copy/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('/local_debug/pmp_input_files_PIC_copy/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\max_land_constr.p', 'rb') as fp:
+with open('/data_inputs/max_land_constr.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 
 #Revise to account for removal of "Fodder_Herb category"
@@ -178,9 +178,9 @@ crop_ids_by_farm = crop_ids_by_farm_new
 crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
 # Load gammas and alphas
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\gammas_new_20201006.p', 'rb') as fp:
+with open('/data_inputs/gammas_new_20201006.p', 'rb') as fp:
     gammas = pickle.load(fp, encoding='latin1')
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\net_prices_new_20201006.p', 'rb') as fp:
+with open('/data_inputs/net_prices_new_20201006.p', 'rb') as fp:
     net_prices = pickle.load(fp, encoding='latin1')
 
 # !JY! replace net_prices with zero value for gammas that equal to zero
@@ -249,7 +249,7 @@ results_pd = results_pd[['nldas','crop','calc_area']]
 results_pd.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\abm_results_baseline.csv')
 
 # read a sample water demand input file
-file = 'C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\RCP8.5_GCAM_water_demand_1980_01_copy.nc'
+file = '/local_debug/pmp_input_files_PIC_copy/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
 with netCDF4.Dataset(file, 'r') as nc:
     # for key, var in nc.variables.items():
     #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
@@ -259,7 +259,7 @@ with netCDF4.Dataset(file, 'r') as nc:
     demand = nc['totalDemand'][:]
 
 # read NLDAS grid reference file
-df_grid = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\NLDAS_Grid_Reference.csv')
+df_grid = pd.read_csv('/local_debug/pmp_input_files_PIC_copy/NLDAS_Grid_Reference.csv')
 
 df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
 

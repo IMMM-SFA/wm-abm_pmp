@@ -15,15 +15,15 @@ import logging
 year = '1981'
 month = '01'
 
-with open('data_inputs/nldas_ids.p', 'rb') as fp:
+with open('../data_inputs/nldas_ids.p', 'rb') as fp:
     nldas_ids = pickle.load(fp)
 
-nldas = pd.read_csv('data_inputs/nldas.txt')
+nldas = pd.read_csv('../data_inputs/nldas.txt')
 
 year_int = int(year)
 months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
-with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
+with open('../data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
     #water_constraints_by_farm = pickle.load(fp)
     water_constraints_by_farm = pickle.load(fp, encoding='latin1')
 water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
@@ -31,7 +31,7 @@ water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 ## Read in Water Availability Files from MOSART-PMP
 
 # pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
-pic_input_dir = 'pic_input_test/'
+pic_input_dir = '../pic_input_test/'
 
 # loop through .nc files and extract data
 first = True
@@ -61,7 +61,7 @@ abm_supply_avail = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
 water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft'].to_dict()
 
 ## Read in PMP calibration files
-data_file = pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
+data_file = pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 data_profit = data_file.parse("Profit")
 water_nirs = data_profit["nir_corrected"]
 nirs = dict(water_nirs)
@@ -69,17 +69,17 @@ nirs = dict(water_nirs)
 ## C.1. Preparing model indices and constraints:
 ids = range(592185)  # total number of crop and nldas ID combinations
 farm_ids = range(53835)  # total number of farm agents / nldas IDs
-with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
+with open('../data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('../data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
-with open('data_inputs/land_constraints_by_farm.p', 'rb') as fp:
+with open('../data_inputs/land_constraints_by_farm.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 
 # Load gammas and alphas
-with open('data_inputs/gammas.p', 'rb') as fp:
+with open('../data_inputs/gammas.p', 'rb') as fp:
     gammas = pickle.load(fp, encoding='latin1')
-with open('data_inputs/net_prices.p', 'rb') as fp:
+with open('../data_inputs/net_prices.p', 'rb') as fp:
     net_prices = pickle.load(fp, encoding='latin1')
 
 x_start_values = dict(enumerate([0.0] * 3))
@@ -134,13 +134,13 @@ print(results.solver.termination_condition)
 result_xs = dict(fwm_s.xs.get_values())
 
 
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
+data_file=pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 data_profit = data_file.parse("Profit")
 sd_no = len(farm_ids)
 crop_types=[str(i) for i in list(pd.unique(data_profit["crop"]))]
 crop_no=len(crop_types)
 gamma1 = list(gammas.values())
-with open('data_inputs/alphas.p', 'rb') as fp:
+with open('../data_inputs/alphas.p', 'rb') as fp:
     alphas = pickle.load(fp, encoding='latin1')
 alpha1 = alphas
 obs_lu = dict(data_profit["area_irrigated"])
@@ -179,7 +179,7 @@ results_pivot = pd.pivot_table(results_pd, index=['nldas'], values=['calc_water_
                                aggfunc=np.sum)  # JY demand is order of magnitude low, double check calcs
 
 # read a sample water demand input file
-file = 'data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
+file = '../data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
 with netCDF4.Dataset(file, 'r') as nc:
     # for key, var in nc.variables.items():
     #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
@@ -189,7 +189,7 @@ with netCDF4.Dataset(file, 'r') as nc:
     demand = nc['totalDemand'][:]
 
 # read NLDAS grid reference file
-df_grid = pd.read_csv('data_inputs/NLDAS_Grid_Reference.csv')
+df_grid = pd.read_csv('../data_inputs/NLDAS_Grid_Reference.csv')
 
 df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
 
@@ -221,7 +221,7 @@ for month in months:
         nc['totalDemand'][:] = np.ma.masked_array(demand_ABM, mask=nc['totalDemand'][:].mask)
 
 
-max_land_constr = pd.read_csv('data_inputs/max_land_constr.csv')
+max_land_constr = pd.read_csv('../data_inputs/max_land_constr.csv')
 temp_df = pd.DataFrame(nldas_ids, columns=['NLDAS_ID'])
 temp_df = pd.merge(temp_df, max_land_constr, on='NLDAS_ID',how='left')
 max_land_constr_dict = temp_df['max_land_constr'].to_dict()
@@ -232,26 +232,26 @@ list_ids = [16173,70008,123843,177678,231513,285348,339183,393018,446853,500688]
 for i in list_ids:
     print(net_prices[i])
 
-with open('net_prices_corn2x.p', 'wb') as handle:
+with open('../net_prices_corn2x.p', 'wb') as handle:
     pickle.dump(net_prices, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # Load in ABM csv results for cropped areas
-water20 = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\abm_results_20perclesswater.csv')
+water20 = pd.read_csv('/local_debug/run_output/abm_results_20perclesswater.csv')
 water20 = water20[(water20.crop=='Wheat')]
 water20_pivot = pd.pivot_table(water20, index=['nldas'], values=['calc_area'],
                                aggfunc=np.sum)  # JY demand is order of magnitude low, double check calcs
 water20_pivot.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\GIS_20water_wheat.csv')
 
-water20 = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\abm_results_baseline.csv')
+water20 = pd.read_csv('/local_debug/run_output/abm_results_baseline.csv')
 water20 = water20[(water20.crop=='Wheat')]
 water20_pivot = pd.pivot_table(water20, index=['nldas'], values=['calc_area'],
                                aggfunc=np.sum)  # JY demand is order of magnitude low, double check calcs
 water20_pivot.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\GIS_baseline_wheat.csv')
 
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\gammas_new_20201006.p', 'rb') as fp:
+with open('/data_inputs/gammas_new_20201006.p', 'rb') as fp:
     gammas_old = pickle.load(fp, encoding='latin1')
 
-with open('alpha_new_20201013_protocol2.p', 'wb') as handle:
+with open('../alpha_new_20201013_protocol2.p', 'wb') as handle:
     pickle.dump(alphas, handle, protocol=2)
 
 ds = xr.open_dataset('C:\\Users\\yoon644\\Desktop\\usgs.mosart.h0.2000-08.nc')
@@ -275,7 +275,7 @@ ds6 = xr.open_dataset('C:\\Users\\yoon644\\Desktop\\USGS_irr_consumption_1999_08
 df6 = ds6.to_dataframe()
 
 mu = 0.2
-hist_avail_bias = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\hist_avail_bias_correction.csv')
+hist_avail_bias = pd.read_csv('/data_inputs/hist_avail_bias_correction.csv')
 hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
 abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev']], on=['NLDAS_ID'])
 abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft'])
@@ -294,7 +294,7 @@ with netCDF4.Dataset(file, 'r') as nc:
     demand = nc['WRM_DEMAND0'][:]
 
 # read NLDAS grid reference file
-df_grid = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\NLDAS_Grid_Reference.csv')
+df_grid = pd.read_csv('/local_debug/pmp_input_files_PIC_copy/NLDAS_Grid_Reference.csv')
 
 df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
 
@@ -317,9 +317,9 @@ except KeyError:
 # read ABM values into df_nc basing on the same index
 df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_water_demand.values
 
-with open('net_prices_new_20201102.p', 'wb') as handle:
+with open('../net_prices_new_20201102.p', 'wb') as handle:
     pickle.dump(net_prices, handle, protocol=pickle.HIGHEST_PROTOCOL)
-with open('max_land_constr_20201102_protocol2.p', 'wb') as handle:
+with open('../max_land_constr_20201102_protocol2.p', 'wb') as handle:
     pickle.dump(land_constraints_by_farm, handle, protocol=2)
 
 #############################
@@ -332,7 +332,7 @@ pd.set_option('display.max_rows', None)
 
 nldas = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_netcdf\\nldas.txt')
 
-with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\pmp_input_files_PIC_copy\\nldas_ids.p', 'rb') as fp:
+with open('/local_debug/pmp_input_files_PIC_copy/nldas_ids.p', 'rb') as fp:
     nldas_ids = pickle.load(fp)
 
 ds = xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\WM Flag Tests\\US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
