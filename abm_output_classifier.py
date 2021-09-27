@@ -71,7 +71,7 @@ abm_min_max = pd.merge(abm_min_max, abm_sum_area_min[['nldas','min_sum_area']], 
 abm_min_max = pd.merge(abm_min_max, abm_sum_area_max[['nldas','max_sum_area']], how='left',on='nldas')
 abm_min_max = pd.merge(abm_min_max, abm_sum_area_avg[['nldas','sum_area_avg']], how='left',on='nldas')
 
-abm_min_max['classification'] = "none"
+abm_min_max['classification'] = "no adaptation"
 
 # threshold for significant crop area average area of grid cell (acres)
 threshold_acres = 800
@@ -79,7 +79,6 @@ threshold_acres = 800
 abm_min_max.loc[(abm_min_max['max_crop_perc'] - abm_min_max['min_crop_perc'] > 0.05), 'classification'] = 'crop_switching'
 abm_min_max.loc[(abm_min_max['min_sum_area'] / abm_min_max['max_sum_area'] < 0.8), 'classification'] = 'crop_expansion'
 abm_min_max.loc[(abm_min_max['min_sum_area'] / abm_min_max['max_sum_area'] < 0.8) & (abm_min_max['max_crop_perc'] - abm_min_max['min_crop_perc'] > 0.2), 'classification'] = 'both'
-abm_min_max.loc[(abm_min_max['sum_area_avg'] < threshold_acres), 'classification'] = 'none'
+abm_min_max.loc[(abm_min_max['sum_area_avg'] < threshold_acres), 'classification'] = 'no ag'
 
-
-abm_min_max.to_csv('abm_output_classification_mem02.corr.csv')
+abm_min_max.to_csv('abm_output_classification_mem02_corr_v2.csv')

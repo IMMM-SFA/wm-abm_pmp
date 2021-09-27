@@ -433,3 +433,4 @@ abm = abm[(abm.PointOrdinal==1)]
 aggregation_functions = {'Total': 'sum'}
 abm_group = abm.groupby(['Year', 'Sub-category'], as_index=False).aggregate(aggregation_functions)
 abm_group.to_csv('abm_group_temp.csv')
+

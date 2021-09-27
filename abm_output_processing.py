@@ -174,7 +174,53 @@ abm_change['change_full'] = np.where(abm_change['1985_crop'] != abm_change['1993
 abm_change['change_short'] = np.where(abm_change['1985_crop'] != abm_change['1993_crop'],abm_change['1993_crop'],'No Change')
 abm_change[(abm_change['change_short']=='No Change')].__len__()
 
-# Working section
+# Combine agent adaptivity classification and water shortage metrics
+adapt = pd.read_csv('abm_output_classification_mem02_corr_v2.csv')
+wm = pd.read_csv('wm_results_noabm_compare_mem02_corr.csv')
+wm = wm[(wm.experiment=='abm')]
+wm['shortage'] = (wm['WRM_DEMAND0'] - wm['WRM_SUPPLY']) / wm['WRM_DEMAND0']
+aggregation_functions = {'shortage': 'max'}
+wm_group = wm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
+wm_group['shortage_class'] = np.where((wm_group['shortage'] >= 0.1), 'yes', 'no')
+adapt = pd.merge(adapt, wm_group, how='left',left_on='nldas',right_on='NLDAS_ID')
+adapt = adapt[(adapt.shortage_class == 'yes')]
+adapt.to_csv('shortage_only_cells_10perc_thres.csv')
+
+# Sensitivity shortage results normalized by baseline value and rank ordered
+sens = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc.csv')
+base = sens[(sens.sen_run=='base')]
+base['rank'] = base.groupby("NAME")["shortage_perc"].rank("dense", ascending=False)
+base = base[['year','NAME','shortage_perc','rank']]
+base.rename(columns={'shortage_perc':'shortage_perc_base', 'rank':'rank_base'}, inplace=True)
+sens = pd.merge(sens, base, how='left', on=['year','NAME'])
+sens['shortage_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base'])
+sens['shortage_perc_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base']) / sens['shortage_perc_base']
+sens = sens.replace([np.inf, -np.inf], np.nan)
+sens = sens.fillna(0)
+sens.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc_ranked.csv')
+
+# Sensitivity shortage results (not normalized by baseline value) and rank ordered
+sens = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc.csv')
+base = sens[(sens.sen_run=='base')]
+base['rank'] = base.groupby("NAME")["shortage_perc"].rank("dense", ascending=False)
+base = base[['year','NAME','shortage_perc','rank']]
+base.rename(columns={'shortage_perc':'shortage_perc_base', 'rank':'rank_base'}, inplace=True)
+sens = pd.merge(sens, base, how='left', on=['year','NAME'])
+sens['shortage_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base'])
+sens['shortage_perc_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base']) / sens['shortage_perc_base']
+sens = sens.replace([np.inf, -np.inf], np.nan)
+sens = sens.fillna(0)
+sens.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc_ranked.csv')
+
+##### Working section
+
+adapt = pd.merge(adapt, huc2[['NLDAS_ID','NAME']], how='left',on='NLDAS_ID')
+adapt_subset = adapt[(adapt.classification == 'crop_switching') | (adapt.classification == 'crop_expansion') | (adapt.classification == 'both')]
+adapt_subset = adapt_subset[(adapt_subset.NAME == 'Missouri Region')]
+adapt_subset_NLDAS = adapt_subset.NLDAS_ID.unique().tolist()
+
+sen_adapt = pd.merge(sen, adapt[['nldas','classification']], how='left',left_on='NLDAS_ID',right_on='nldas')
+
 
 abm2000_max = abm2000.loc[abm2000.groupby("nldas")["calc_area"].idxmax()]
 

@@ -20,15 +20,15 @@ huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
 states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 
 # switch to directory with ABM runs
-os.chdir('C:\\Users\\yoon644\\Desktop\\corrected test')
+# os.chdir('C:\\Users\\yoon644\\Desktop\\corrected test')
 
 
 # Develop csv file for visualizing crop areas in Tableau
 # Load in ABM csv results for cropped areas
-for year in range(15): # change back to 70
+for year in range(70): # change back to 70
     print(year)
     abm = pd.read_csv('abm_results_' + str(year+1950))  # change back to 1940
-    #abm = abm[(abm.nldas=='x309y67')] ### JY TEMP
+    abm['nldas'] = abm['nldas'].astype(str)
     aggregation_functions = {'calc_area': 'sum'}
     if year == 0:
         abm = pd.merge(abm, huc2[['NLDAS_ID', 'NAME']], how='left',left_on='nldas',right_on='NLDAS_ID')
@@ -51,4 +51,5 @@ abm_summary['Join'] = 1
 sigmoid = pd.read_csv('AreaBumpModelv3.csv')
 abm_summary = pd.merge(abm_summary, sigmoid, on='Join', how='inner')
 abm_summary = abm_summary.rename(columns={"crop": "Sub-category", "NAME": "_Category", "calc_area": "Total", "year": "Year"})
-abm_summary.to_csv('abm_join_sigmoid_corrected_test.csv', index=False)
+abm_summary['Total'] = abm_summary['Total'] / 1000  # correct areas to be in appropriate unit (acres)
+abm_summary.to_csv('abm_join_sigmoid_adaptonly.csv', index=False)
