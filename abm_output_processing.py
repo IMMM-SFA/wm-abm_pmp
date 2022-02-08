@@ -42,7 +42,7 @@ for year in range(70):
         abm_summary_to_append['year'] = year+1940
         abm_summary = abm_summary.append(abm_summary_to_append)
 
-# Join to sigmoid model
+# Join to sigmoid model for area bump charts in Tableau
 abm_summary['Join'] = 1
 sigmoid = pd.read_csv('AreaBumpModelv3.csv')
 abm_summary = pd.merge(abm_summary, sigmoid, on='Join', how='inner')

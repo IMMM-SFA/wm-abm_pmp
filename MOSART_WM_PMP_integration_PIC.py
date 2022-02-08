@@ -149,7 +149,7 @@ def calc_demand(year, month):
             logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
 
             ## Read in PMP calibration files
-            data_file=pd.ExcelFile("/pic/projects/im3/wm/Jim/pmp_input_files/MOSART_WM_PMP_inputs_20201028.xlsx")
+            data_file=pd.ExcelFile("/pic/projects/im3/wm/Jim/pmp_input_files/MOSART_WM_PMP_inputs_20201028_GW.xlsx")
             data_profit = data_file.parse("Profit")
             water_nirs=data_profit["nir_corrected"]
             nirs=dict(water_nirs)
