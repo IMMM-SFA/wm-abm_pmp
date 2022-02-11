@@ -434,3 +434,19 @@ aggregation_functions = {'Total': 'sum'}
 abm_group = abm.groupby(['Year', 'Sub-category'], as_index=False).aggregate(aggregation_functions)
 abm_group.to_csv('abm_group_temp.csv')
 
+
+for i in range(2,53835):
+    #3
+    if 53835 % i == 0:
+        #4
+        print(i)
+
+
+## D.1. Storing main model outputs:
+result_xs_sw = dict(fwm.xs_sw.get_values())
+result_xs_gw = dict(fwm.xs_gw.get_values())
+result_xs_total = dict(fwm.xs_total.get_values())
+
+# JY results stored as pickle file (results_xs.p). Start here and load pickle files.
+with open('result_xs.p', 'rb') as fp:
+    result_xs = pickle.load(fp)
