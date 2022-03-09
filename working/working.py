@@ -84,6 +84,21 @@ with open('../data_inputs/net_prices.p', 'rb') as fp:
 
 x_start_values = dict(enumerate([0.0] * 3))
 
+# Load gammas and alphas
+with open('./data_inputs/alphas_total_20220227_protocol2.p', 'rb') as fp:
+    alphas_total_compare = pickle.load(fp, encoding='latin1')
+with open('./data_inputs/gammas_total_20220227_protocol2.p', 'rb') as fp:
+    gammas_total_compare = pickle.load(fp, encoding='latin1')
+with open('./data_inputs/alphas_sw_20220227_protocol2.p', 'rb') as fp:
+    alphas_sw_compare = pickle.load(fp, encoding='latin1')
+with open('./data_inputs/gammas_sw_20220227_protocol2.p', 'rb') as fp:
+    gammas_sw_compare = pickle.load(fp, encoding='latin1')
+with open('./data_inputs/net_prices_gw_20220227_protocol2.p', 'rb') as fp:
+    net_prices_gw_compare = pickle.load(fp, encoding='latin1')
+with open('./data_inputs/net_prices_sw_20220227_protocol2.p', 'rb') as fp:
+    net_prices_sw_compare = pickle.load(fp, encoding='latin1')
+
+
 ## C.2. 2st stage: Quadratic model included in JWP model simulations
 ## C.2.a. Constructing model inputs:
 ##  (repetition to be safe - deepcopy does not work on PYOMO models)
@@ -322,6 +337,21 @@ with open('../net_prices_new_20201102.p', 'wb') as handle:
 with open('../max_land_constr_20201102_protocol2.p', 'wb') as handle:
     pickle.dump(land_constraints_by_farm, handle, protocol=2)
 
+with open('../net_prices_total_20220308.p', 'wb') as handle:
+    pickle.dump(net_prices_total, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open('../net_prices_total_20220308_protocol2.p', 'wb') as handle:
+    pickle.dump(net_prices_total, handle, protocol=2)
+
+for key in range(53835):
+    if land_constraints_by_farm[key] != land_constraints_by_farm_v2[key]:
+        print(land_constraints_by_farm[key])
+        print(land_constraints_by_farm_v2[key])
+
+keys = [36335, 90170, 144005, 197840, 251675, 305510, 359345, 413180, 467015, 520850]
+obs_lu_calc_temp = 0
+for id in keys:
+    obs_lu_calc_temp += obs_lu_total[id]
+
 #############################
 import pandas as pd
 import xarray as xr
@@ -450,3 +480,14 @@ result_xs_total = dict(fwm.xs_total.get_values())
 # JY results stored as pickle file (results_xs.p). Start here and load pickle files.
 with open('result_xs.p', 'rb') as fp:
     result_xs = pickle.load(fp)
+
+
+with open('test6.csv', 'w') as f:
+    for key in gammas_total.keys():
+        f.write("%s, %s\n" % (key, gammas_total[key]))
+
+import matplotlib.pylab as plt
+lists = sorted(gammas_sw.items()) # sorted by key, return a list of tuples
+x, y = zip(*lists) # unpack a list of pairs into two tuples
+plt.plot(x, y)
+plt.show()

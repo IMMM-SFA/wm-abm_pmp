@@ -16,8 +16,12 @@ import pdb
 
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201028_GW.xlsx")
+#data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201028_GW.xlsx")
+data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
 data_profit = data_file.parse("Profit")
+data_profit['area_irrigated'] = data_profit['area_irrigated'] * 1000
+data_profit['area_irrigated_gw'] = data_profit['area_irrigated_gw'] * 1000
+data_profit['area_irrigated_sw'] = data_profit['area_irrigated_sw'] * 1000
 aggregation_functions = {'area_irrigated_sw': 'sum'}
 area_irrigated_sw_farm = data_profit.groupby(['nldas'], as_index=False).aggregate(aggregation_functions)
 
@@ -38,7 +42,9 @@ water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
 with open('data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('data_inputs/max_land_constr_20201102.p', 'rb') as fp:
+# with open('data_inputs/max_land_constr_20201102.p', 'rb') as fp:
+#     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
+with open('data_inputs/max_land_constr_20220307_protocol2.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 with open('data_inputs/water_constraints_by_farm_v2.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp, encoding='latin1')
@@ -77,8 +83,8 @@ alphas_sw=data_profit["alpha"].head(53835)  # ids for surface water are farm spe
 
 # linear_term_sum=[p*y - c - (swc*n) - (gwc*n) - aland - asw for p,y,c,swc,gwc,n,aland,asw in zip(prices,yields,land_costs,sw_costs,gw_costs,water_nirs,alphas_land,alphas_sw)]
 linear_term_sum_total = [p*y - c - aland for p,y,c,aland in zip(prices,yields,land_costs,alphas_total)]
-linear_term_sum_sw = [-(swc*n) for swc,n in zip(sw_costs,water_nirs)]
-linear_term_sum_gw = [-(gwc*n) for gwc,n in zip(gw_costs,water_nirs)]
+linear_term_sum_sw = [-(swc*n*1000) for swc,n in zip(sw_costs,water_nirs)]  # multiply by 1000 to get to non-corrected NIRs
+linear_term_sum_gw = [-(gwc*n*1000) for gwc,n in zip(gw_costs,water_nirs)]
 # linear_term_sum_gw = [p*y - c - (gwc*n) - aland for p,y,c,gwc,n,aland in zip(prices,yields,land_costs,gw_costs,water_nirs,alphas_total)]
 
 ## B.3. Preparing model vars and params: (these need to be dict()!)
@@ -112,18 +118,18 @@ fwm.xs_gw = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
 obs_lu_total = dict(data_profit["area_irrigated"])
 obs_lu_sw = dict(area_irrigated_sw_farm["area_irrigated_sw"])
 crop_counter = 0
-for key,value in obs_lu_total.items():
-    if crop_counter == 53835:
-        crop_counter = 0
-    if value == 0:
-        obs_lu_total[key] = .0001  # NEED TO ACCOUNT FOR THIS IN OBS_LU_SW below
-        obs_lu_sw[crop_counter] += .0001
-    crop_counter += 1
+# for key,value in obs_lu_total.items():  # JY TEMP comment out
+#     if crop_counter == 53835:
+#         crop_counter = 0
+#     if value == 0:
+#         obs_lu_total[key] = .0001  # NEED TO ACCOUNT FOR THIS IN OBS_LU_SW below
+#         obs_lu_sw[crop_counter] += .00005  # JY revised from .0001
+#     crop_counter += 1
 fwm.obs_lu_total = Param(fwm.ids, initialize=obs_lu_total, mutable=True)
 fwm.obs_lu_sw = Param(fwm.farm_ids, initialize=obs_lu_sw, mutable=True)  # JY EDIT
 fwm.nirs = Param(fwm.ids, initialize=nirs, mutable=True)
 
-## C.2. Constructing model functions:
+## C.2. Constructing model functions:  #!JY! test multiply by 1000 to get non-adjusted NIR
 def obj_fun(fwm):
     return sum(sum((fwm.net_prices_total[h] * fwm.xs_total[h]) for h in fwm.crop_ids_by_farm[f]) +
                sum((fwm.net_prices_sw[i] * fwm.xs_sw[i]) for i in fwm.crop_ids_by_farm[f]) +
@@ -226,16 +232,18 @@ gammas_sw = dict(enumerate(gamma1_sw))
 
 import datetime
 start_time = datetime.datetime.now()
-chunk_size = 555  # JY temp, eventually convert into a loop
+# chunk_size = 555  # JY temp, eventually convert into a loop
+chunk_size = 1
 no_of_chunks = len(farm_ids) / chunk_size
 
 first = True
-for n in range(int(1)):
+for n in [1]:
+# for n in range(int(1)):
 # for n in range(int(no_of_chunks)):
     print('starting chunk: ' + str(n))
     # subset farm ids
-    farm_ids_subset = list(range(chunk_size*n, chunk_size*(n+1)))
-
+    # farm_ids_subset = list(range(chunk_size*n, chunk_size*(n+1)))
+    farm_ids_subset = list(range(36335, 36336))
     # subset crop ids
     crop_ids_by_farm_subset = {key: crop_ids_by_farm[key] for key in farm_ids_subset}
     ids_subset = []
@@ -255,6 +263,11 @@ for n in range(int(1)):
     gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
     land_constraints_by_farm_subset = {key: land_constraints_by_farm[key] for key in farm_ids_subset}
     water_constraints_by_farm_subset = {key: water_constraints_by_farm[key] for key in farm_ids_subset}
+
+    # set price to zero for gammas that are zero
+    for key,value in gammas_total_subset.items():
+        if value == 0:
+            net_prices_total_subset[key] = -9999999999
 
     ## C.2. 2st stage: Quadratic model included in JWP model simulations
     ## C.2.a. Constructing model inputs:
@@ -291,16 +304,16 @@ for n in range(int(1)):
                    (0.5 * fwm_s.gammas_sw[f] * sum(fwm_s.xs_sw[t] for t in fwm_s.crop_ids_by_farm[f])) * sum(fwm_s.xs_sw[u] for u in fwm_s.crop_ids_by_farm[f]) for f in fwm_s.farm_ids)  # JY double check this!
     fwm_s.obj_f = Objective(rule=obj_fun, sense=maximize)
 
-    def land_constraint(fwm_s, ff):
-        return sum(fwm_s.xs_total[i] for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.land_constraints[ff]
-    fwm_s.c1 = Constraint(fwm_s.farm_ids, rule=land_constraint)
+    # def land_constraint(fwm_s, ff):
+    #     return sum(fwm_s.xs_total[i] for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.land_constraints[ff]
+    # fwm_s.c1 = Constraint(fwm_s.farm_ids, rule=land_constraint)
 
     def obs_lu_constraint_sum(fwm_s, i):
         return fwm_s.xs_sw[i] + fwm_s.xs_gw[i] == fwm_s.xs_total[i]
     fwm_s.c5 = Constraint(fwm_s.ids, rule=obs_lu_constraint_sum)
     #
     # def water_constraint(fwm_s, ff):
-    #     return sum(fwm_s.xs[i]*fwm_s.nirs[i] for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]
+    #     return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i]*1000 for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]
     # fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=water_constraint)
 
     ## C.2.c Creating and running the solver:
@@ -345,14 +358,14 @@ for n in range(int(1)):
     results_pd = results_pd.drop(['xs_gw_temp', 'xs_sw_temp', 'xs_total_temp'], axis=1)
 
 # JY store results into a pandas dataframe
-results_pd = data_profit
 results_pd = results_pd.assign(calc_area=result_xs.values())
-results_pd = results_pd.assign(nir=nirs.values())
-results_pd['calc_water_demand'] = results_pd['calc_area'] * results_pd['nir'] / 25583.64
-results_pivot = pd.pivot_table(results_pd, index=['nldas'], values=['calc_water_demand'], aggfunc=np.sum) #JY demand is order of magnitude low, double check calcs
+results_pd['calc_gw_demand'] = results_pd['xs_gw'] * results_pd['nir_corrected'] / 25583.64  # unit conversion from acre-ft/year to m3/s; calc area [acres], nir [acre-ft/acres/year]
+results_pd['calc_sw_demand'] = results_pd['xs_sw'] * results_pd['nir_corrected'] / 25583.64  # unit conversion from acre-ft/year to m3/s; calc area [acres], nir [acre-ft/acres/year]
+results_pd['calc_total_demand'] = results_pd['xs_total'] * results_pd['nir_corrected'] / 25583.64  # unit conversion from acre-ft/year to m3/s; calc area [acres], nir [acre-ft/acres/year]
+results_pivot = pd.pivot_table(results_pd, index=['nldas'], values=['calc_gw_demand', 'calc_sw_demand', 'calc_total_demand'], aggfunc=np.sum)  #JY demand is order of magnitude low, double check calcs
 
 # JY export results to csv
-results_pd = results_pd[['nldas','crop','calc_area']]
+results_pd = results_pd[['nldas','crop','xs_gw','xs_sw','xs_total','nir_corrected']]
 results_pd.to_csv('/pic/scratch/yoon644/csmruns/wm_abm_run/run/abm_results_'+ str(year_int))
 
 # read a sample water demand input file
@@ -387,7 +400,7 @@ except KeyError:
     pass
 
 # read ABM values into df_nc basing on the same index
-df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_water_demand.values
+df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_sw_demand.values
 
 for month in months:
     str_year = str(year_int)
