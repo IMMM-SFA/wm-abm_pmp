@@ -12,6 +12,8 @@ pd.set_option('display.max_rows', None)
 
 # switch to directory with ABM runs
 os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr')
+# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results')
+#
 
 # Load in NLDAS/HUC-2 join table
 huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
@@ -54,13 +56,14 @@ abm_summary.to_csv('abm_join_202104_mem02_corr.csv', index=False)
 
 # Join wm_results_summary file (processed on PIC via wm_pmp/WM_output_PIC_ncdf.py) with various geographies
 wm_results = pd.read_csv('wm_summary_results_mem02_corr.csv')
+wm_results = pd.read_csv('wm_summary_results_20220418_abm.csv')
 wm_results = pd.merge(wm_results, huc2[['NLDAS_ID','NAME']], how='left', on='NLDAS_ID')
 wm_results = pd.merge(wm_results, states_etc[['NLDAS_ID','ERS_region','State']], how='left',on='NLDAS_ID')
 wm_results.to_csv('wm_summary_results_join_v7.csv')
 
 # Read wm_results_summary file for baseline (no abm) and merge with above
 wm_results['experiment'] = 'abm'
-wm_results_noabm = pd.read_csv('wm_summary_results_noabm.csv')
+wm_results_noabm = pd.read_csv('wm_summary_results_20220415_noabm 2.csv')
 wm_results_noabm = pd.merge(wm_results_noabm, huc2[['NLDAS_ID','NAME']], how='left', on='NLDAS_ID')
 wm_results_noabm = pd.merge(wm_results_noabm, states_etc[['NLDAS_ID','ERS_region','State']], how='left',on='NLDAS_ID')
 wm_results_noabm['experiment'] = 'no abm'
@@ -132,6 +135,22 @@ wm_results_avg_noabm = wm_results_noabm.groupby(['NLDAS_ID'], as_index=False).ag
 wm_results_avg_noabm = wm_results_avg_noabm.rename(columns={"WRM_DEMAND0": "WRM_DEMAND0_noabm"})
 wm_results_difference = pd.merge(wm_results_avg[['NLDAS_ID','NAME','ERS_region','State','WRM_DEMAND0_abm']], wm_results_avg_noabm[['NLDAS_ID','WRM_DEMAND0_noabm']], how='left', on='NLDAS_ID')
 wm_results_difference['avg_demand_diff'] = wm_results_difference['WRM_DEMAND0_abm'] - wm_results_difference['WRM_DEMAND0_noabm']
+
+# Calculate annual shortage and compare between abm run and no abm run
+wm_results = wm_results[(wm_results.year>=1950)]
+wm_results = wm_results.fillna(0)
+wm_results['shortage'] = wm_results['WRM_DEMAND0'] - wm_results['WRM_SUPPLY']
+aggregation_functions = {'shortage': 'sum', 'NLDAS_ID': 'first', 'State': 'first'}
+wm_results_sum = wm_results.groupby(['NAME', 'year'], as_index=False).aggregate(aggregation_functions)
+wm_results_sum = wm_results_sum.rename(columns={"shortage": "shortage_abm"})
+wm_results_noabm = wm_results_noabm[(wm_results_noabm.year>=1950)]
+wm_results_noabm = wm_results_noabm.fillna(0)
+wm_results_noabm['shortage'] = wm_results_noabm['WRM_DEMAND0'] - wm_results_noabm['WRM_SUPPLY']
+#wm_results_max_noabm = wm_results_noabm.loc[wm_results_noabm.groupby("NLDAS_ID")["WRM_DEMAND0"].idxmax()]
+wm_results_sum_noabm = wm_results_noabm.groupby(['NAME', 'year'], as_index=False).aggregate(aggregation_functions)
+wm_results_sum_noabm = wm_results_sum_noabm.rename(columns={"shortage": "shortage_noabm"})
+wm_results_difference = pd.merge(wm_results_sum[['NLDAS_ID','NAME','State','shortage_abm','year']], wm_results_sum_noabm[['NAME','shortage_noabm','year']], how='left', on=['NAME','year'])
+wm_results_difference['shortage_diff'] = wm_results_difference['shortage_abm'] - wm_results_difference['shortage_noabm']
 
 # Calculate the max level of shortage and take difference between abm run and no abm run
 wm_results['shortage_perc_abm'] = 1.0 - (wm_results['WRM_SUPPLY'] / wm_results['WRM_DEMAND0'])

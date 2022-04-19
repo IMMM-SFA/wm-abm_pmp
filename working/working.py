@@ -263,8 +263,8 @@ water20_pivot = pd.pivot_table(water20, index=['nldas'], values=['calc_area'],
                                aggfunc=np.sum)  # JY demand is order of magnitude low, double check calcs
 water20_pivot.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\local_debug\\run_output\\GIS_baseline_wheat.csv')
 
-with open('/data_inputs/gammas_new_20201006.p', 'rb') as fp:
-    gammas_old = pickle.load(fp, encoding='latin1')
+with open('/data_inputs/alphas_sw_20220323.p', 'rb') as fp:
+    alphas_sw = pickle.load(fp, encoding='latin1')
 
 with open('../alpha_new_20201013_protocol2.p', 'wb') as handle:
     pickle.dump(alphas, handle, protocol=2)
@@ -337,9 +337,9 @@ with open('../net_prices_new_20201102.p', 'wb') as handle:
 with open('../max_land_constr_20201102_protocol2.p', 'wb') as handle:
     pickle.dump(land_constraints_by_farm, handle, protocol=2)
 
-with open('../net_prices_total_20220308.p', 'wb') as handle:
-    pickle.dump(net_prices_total, handle, protocol=pickle.HIGHEST_PROTOCOL)
-with open('../net_prices_total_20220308_protocol2.p', 'wb') as handle:
+with open('../gammas_gw_20220405.p', 'wb') as handle:
+    pickle.dump(gammas_gw, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open('../net_prices_total_dict_20220408_protocol2.p', 'wb') as handle:
     pickle.dump(net_prices_total, handle, protocol=2)
 
 for key in range(53835):
@@ -491,3 +491,30 @@ lists = sorted(gammas_sw.items()) # sorted by key, return a list of tuples
 x, y = zip(*lists) # unpack a list of pairs into two tuples
 plt.plot(x, y)
 plt.show()
+
+with open('/pic/projects/im3/wm/Jim/pmp_input_files/water_constraints_by_farm_pyt278.p', 'rb') as fp:
+    water_constraints_by_farm = pickle.load(fp)
+# water_constraints_by_farm = pd.read_pickle('/pic/projects/im3/wm/Jim/pmp_input_files/water_constraints_by_farm_v2.p')
+water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
+
+
+## Read in Water Availability Files from MOSART-PMP
+water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv') # Use baseline water demand data for warmup period
+water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
+water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
+
+with netCDF4.Dataset('/pic/projects/im3/wm/Jim/pmp_input_files/RCP8.5_GCAM_water_demand_1980_01_copy.nc', 'r') as nc:
+    # for key, var in nc.variables.items():
+    #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
+
+    lat = nc['lat'][:]
+    lon = nc['lon'][:]
+
+
+with open('C:\\Users\\yoon644\\Desktop\\alphas_sw_20220329_protocol2.p', 'rb') as fp:
+    alphas_sw = pickle.load(fp)
+
+with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/sw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
+    sw_constraints_by_farm = pickle.load(fp)
+with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
+    gw_constraints_by_farm = pickle.load(fp)

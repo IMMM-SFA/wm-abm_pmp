@@ -18,6 +18,7 @@ logging.basicConfig(filename='/pic/scratch/yoon644/csmruns/wm_abm_run/run/app.lo
 logging.info('Successfully loaded all Python modules')
 
 sys.stdout = open('/pic/scratch/yoon644/csmruns/wm_abm_run/run/python_stdout.log', 'w')
+sys.stderr = open('/pic/scratch/yoon644/csmruns/wm_abm_run/run/python_stderr.log', 'w')
 
 def calc_demand(year, month):
 
@@ -49,14 +50,16 @@ def calc_demand(year, month):
 
 
             ## Read in Water Availability Files from MOSART-PMP
-            if year_int<1950:  # If year is before 1950 (warm-up period), use the external baseline water demand files
-                water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv') # Use baseline water demand data for warmup period
-                water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
-                water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
+            if year_int<=1940:  # If year is before 1950 (warm-up period), use the external baseline water demand files
+                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv') # Use baseline water demand data for warmup period
+                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
+                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol'].to_dict()
+            elif year_int<1950:
+                return None
             elif year_int==1950:  # For first year of ABM, use baseline water demand data
-                water_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv')
-                water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
-                water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol'].to_dict()
+                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv')
+                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
+                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol'].to_dict()
             else:
 
                 #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
@@ -143,7 +146,7 @@ def calc_demand(year, month):
                 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
                 abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor','RIVER_DISCHARGE_OVER_LAND_LIQ_OG']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
                 abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'] = abm_supply_avail['WRM_SUPPLY_acreft_updated'] + abm_supply_avail['sw_avail_bias_corr']
-                water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
+                sw_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
                 logging.info('Successfully converted units df for month, year: ' + month + ' ' + year)
 
             logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
@@ -163,8 +166,12 @@ def calc_demand(year, month):
                 crop_ids_by_farm = pickle.load(fp)
             with open('/pic/projects/im3/wm/Jim/pmp_input_files/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
                 crop_ids_by_farm_and_constraint = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/max_land_constr_20220223_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/max_land_constr_20220307_protocol2.p', 'rb') as fp:
                 land_constraints_by_farm = pickle.load(fp)
+            # with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/sw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
+            #     sw_constraints_by_farm = pickle.load(fp)
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
+                gw_constraints_by_farm = pickle.load(fp)
 
             # Revise to account for removal of "Fodder_Herb category"
             crop_ids_by_farm_new = {}
@@ -174,19 +181,19 @@ def calc_demand(year, month):
             crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
             # Load gammas, net prices, etc
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_total_20220303_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220408/gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
                 gammas_total = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_total_20220303_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220408/net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
                 net_prices_total = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/alphas_total_20220303_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220408//alphas_total_dict_20220408_protocol2.p', 'rb') as fp:
                 alphas_total = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_sw_20220303_protocol2.p', 'rb') as fp:
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_sw_20220323_protocol2.p', 'rb') as fp:
                 net_prices_sw = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/alphas_sw_20220303_protocol2.p', 'rb') as fp:
-                alphas_sw = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_sw_20220303_protocol2.p', 'rb') as fp:
-                gammas_sw = pickle.load(fp)
-            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_gw_20220303_protocol2.p', 'rb') as fp:
+            # with open('/pic/projects/im3/wm/Jim/pmp_input_files/alphas_sw_20220323_protocol2.p', 'rb') as fp:
+                # alphas_sw = pickle.load(fp)
+            # with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_sw_20220323_protocol2.p', 'rb') as fp:
+                # gammas_sw = pickle.load(fp)
+            with open('/pic/projects/im3/wm/Jim/pmp_input_files/net_prices_gw_20220323_protocol2.p', 'rb') as fp:
                 net_prices_gw = pickle.load(fp)
 
             x_start_values=dict(enumerate([0.0]*3))
@@ -222,10 +229,18 @@ def calc_demand(year, month):
                 net_prices_gw_subset = {key: net_prices_gw[key] for key in ids_subset_sorted}
                 gammas_total_subset = {key: gammas_total[key] for key in ids_subset_sorted}
                 nirs_subset = {key: nirs[key] for key in ids_subset_sorted}
-                alphas_sw_subset = {key: alphas_sw[key] for key in farm_ids_subset}
-                gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
+                # alphas_sw_subset = {key: alphas_sw[key] for key in farm_ids_subset}
+                # gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
                 land_constraints_by_farm_subset = {key: land_constraints_by_farm[key] for key in farm_ids_subset}
-                water_constraints_by_farm_subset = {key: water_constraints_by_farm[key] for key in farm_ids_subset}
+                # water_constraints_by_farm_subset = {key: water_constraints_by_farm[key] for key in farm_ids_subset}
+                gw_constraints_by_farm_subset = {key: gw_constraints_by_farm[key] for key in farm_ids_subset}
+                sw_constraints_by_farm_subset = {key: sw_constraints_by_farm[key] for key in farm_ids_subset}
+                # water_constraints_by_farm_subset[36335] = 63026538.58  ### JY TEMP
+
+                # set price to zero for gammas that are zero
+                for key,value in gammas_total_subset.items():
+                    if value == 0:
+                        net_prices_total_subset[key] = -9999999999
 
                 ## C.2. 2st stage: Quadratic model included in JWP model simulations
                 ## C.2.a. Constructing model inputs:
@@ -240,10 +255,14 @@ def calc_demand(year, month):
                 fwm_s.net_prices_total = Param(fwm_s.ids, initialize=net_prices_total_subset, mutable=True)
                 fwm_s.net_prices_gw = Param(fwm_s.ids, initialize=net_prices_gw_subset, mutable=True)
                 fwm_s.gammas_total = Param(fwm_s.ids, initialize=gammas_total_subset, mutable=True)
-                fwm_s.alphas_sw = Param(fwm_s.farm_ids, initialize=alphas_sw_subset, mutable=True)
-                fwm_s.gammas_sw = Param(fwm_s.farm_ids, initialize=gammas_sw_subset, mutable=True)
+                # fwm_s.alphas_sw = Param(fwm_s.farm_ids, initialize=alphas_sw_subset, mutable=True)
+                # fwm_s.gammas_sw = Param(fwm_s.farm_ids, initialize=gammas_sw_subset, mutable=True)
                 fwm_s.land_constraints = Param(fwm_s.farm_ids, initialize=land_constraints_by_farm_subset, mutable=True)
-                fwm_s.water_constraints = Param(fwm_s.farm_ids, initialize=water_constraints_by_farm_subset,
+                # fwm_s.water_constraints = Param(fwm_s.farm_ids, initialize=water_constraints_by_farm_subset,
+                                                # mutable=True)
+                fwm_s.sw_constraints = Param(fwm_s.farm_ids, initialize=sw_constraints_by_farm_subset,
+                                                mutable=True)
+                fwm_s.gw_constraints = Param(fwm_s.farm_ids, initialize=gw_constraints_by_farm_subset,
                                                 mutable=True)
                 fwm_s.xs_total = Var(fwm_s.ids, domain=NonNegativeReals, initialize=x_start_values)
                 fwm_s.xs_sw = Var(fwm_s.ids, domain=NonNegativeReals, initialize=x_start_values)
@@ -256,17 +275,21 @@ def calc_demand(year, month):
 
                 ## C.2. Constructing model functions:
                 def obj_fun(fwm_s):
-                    return 0.00001 * sum(sum((fwm_s.net_prices_total[h] * fwm_s.xs_total[h] - 0.5 * fwm_s.gammas_total[
-                        h] * fwm_s.xs_total[h] * fwm_s.xs_total[h]) for h in fwm_s.crop_ids_by_farm[f]) +
-                                         sum((fwm_s.net_prices_sw[i] * fwm_s.xs_sw[i]) for i in
-                                             fwm_s.crop_ids_by_farm[f]) +
-                                         sum((fwm_s.net_prices_gw[g] * fwm_s.xs_gw[g]) for g in
-                                             fwm_s.crop_ids_by_farm[f]) -
-                                         (fwm_s.alphas_sw[f] * sum(fwm_s.xs_sw[s] for s in fwm_s.crop_ids_by_farm[f])) -
-                                         (0.5 * fwm_s.gammas_sw[f] * sum(
-                                             fwm_s.xs_sw[t] for t in fwm_s.crop_ids_by_farm[f])) * sum(
-                        fwm_s.xs_sw[u] for u in fwm_s.crop_ids_by_farm[f]) for f in
-                                         fwm_s.farm_ids)  # JY double check this!
+                    return 0.00001 * sum(sum((fwm_s.net_prices_total[h] * fwm_s.xs_total[h] - 0.5 * fwm_s.gammas_total[h] * fwm_s.xs_total[h] * fwm_s.xs_total[h]) for h in fwm_s.crop_ids_by_farm[f]) +
+                        sum((fwm_s.net_prices_sw[i] * fwm_s.xs_sw[i]) for i in fwm_s.crop_ids_by_farm[f]) +
+                        sum((fwm_s.net_prices_gw[g] * fwm_s.xs_gw[g]) for g in fwm_s.crop_ids_by_farm[f]) for f in fwm_s.farm_ids)  # JY double check this!
+
+                    # return 0.00001 * sum(sum((fwm_s.net_prices_total[h] * fwm_s.xs_total[h] - 0.5 * fwm_s.gammas_total[
+                    #     h] * fwm_s.xs_total[h] * fwm_s.xs_total[h]) for h in fwm_s.crop_ids_by_farm[f]) +
+                    #                      sum((fwm_s.net_prices_sw[i] * fwm_s.xs_sw[i]) for i in
+                    #                          fwm_s.crop_ids_by_farm[f]) +
+                    #                      sum((fwm_s.net_prices_gw[g] * fwm_s.xs_gw[g]) for g in
+                    #                          fwm_s.crop_ids_by_farm[f]) -
+                    #                      (fwm_s.alphas_sw[f] * sum(fwm_s.xs_sw[s] for s in fwm_s.crop_ids_by_farm[f])) -
+                    #                      (0.5 * fwm_s.gammas_sw[f] * sum(
+                    #                          fwm_s.xs_sw[t] for t in fwm_s.crop_ids_by_farm[f])) * sum(
+                    #     fwm_s.xs_sw[u] for u in fwm_s.crop_ids_by_farm[f]) for f in
+                    #                      fwm_s.farm_ids)  # JY double check this!
 
                 fwm_s.obj_f = Objective(rule=obj_fun, sense=maximize)
 
@@ -281,9 +304,17 @@ def calc_demand(year, month):
 
                 fwm_s.c5 = Constraint(fwm_s.ids, rule=obs_lu_constraint_sum)
 
-                def water_constraint(fwm_s, ff):
-                    return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i]*1000 for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]  # JY multiplication by 1,000 gets us back to non-scaled NIR values
-                fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=water_constraint)
+                # def water_constraint(fwm_s, ff):
+                #     return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i]*(1000/1000) for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]  # JY multiplication by 1,000 gets us back to non-scaled NIR values, and divide 1,000 to account for scaling of areas
+                # fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=water_constraint)
+
+                def sw_constraint(fwm_s, ff):
+                    return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i] for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.sw_constraints[ff]
+                fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=sw_constraint)
+
+                def gw_constraint(fwm_s, ff):
+                    return sum(fwm_s.xs_gw[i]*fwm_s.nirs[i] for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.gw_constraints[ff]
+                fwm_s.c6 = Constraint(fwm_s.farm_ids, rule=gw_constraint)
 
                 logging.info('I have successfully constructed pyomo model for month, year, chunk: ' + month + ' ' + year + ' ' + str(n))
 
@@ -374,17 +405,29 @@ def calc_demand(year, month):
             # read ABM values into df_nc basing on the same index
             df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_sw_demand.values
 
-            for month in months:
-                str_year = str(year_int)
-                new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
-                shutil.copyfile(file, new_fname)
-                demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
-                with netCDF4.Dataset(new_fname,'a') as nc:
-                    nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
+            if year_int<=1940:
+                for yr in range(10):
+                    for month in months:
+                        year_out = year_int + yr + 1
+                        str_year = str(year_out)
+                        new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
+                        shutil.copyfile(file, new_fname)
+                        demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
+                        with netCDF4.Dataset(new_fname,'a') as nc:
+                            nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
+
+            else:
+                for month in months:
+                    str_year = str(year_int)
+                    new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
+                    shutil.copyfile(file, new_fname)
+                    demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
+                    with netCDF4.Dataset(new_fname,'a') as nc:
+                        nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 
             logging.info('I have successfully written out new demand files for month, year: ' + month + ' ' + year)
 
         else:
             pass
-    except IOError as e:
+    except Exception as e:
         logging.exception(str(e))

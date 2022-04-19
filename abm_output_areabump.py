@@ -11,7 +11,8 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
 # switch to directory with ABM runs
-os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr')
+# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr')
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results')
 
 # Load in NLDAS/HUC-2 join table
 huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
@@ -25,11 +26,22 @@ states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 
 # Develop csv file for visualizing crop areas in Tableau
 # Load in ABM csv results for cropped areas
-for year in range(70): # change back to 70
+for year in range(60): # change back to 70
     print(year)
     abm = pd.read_csv('abm_results_' + str(year+1950))  # change back to 1940
     abm['nldas'] = abm['nldas'].astype(str)
-    aggregation_functions = {'calc_area': 'sum'}
+    aggregation_functions = {'xs_gw': 'sum', 'xs_sw': 'sum', 'xs_total': 'sum'}
+    # Redistribute crops for GW/SW model (otherwise crop allocation split between GW/SW at farm level is arbitrary)
+    reallocate_df = abm.groupby(['nldas'], as_index=False).aggregate(aggregation_functions)
+    reallocate_df['perc_gw'] = 0
+    reallocate_df.loc[(reallocate_df.xs_total > 0), 'perc_gw'] = reallocate_df['xs_gw'] / reallocate_df['xs_total']
+    reallocate_df['perc_sw'] = 0
+    reallocate_df.loc[(reallocate_df.xs_total > 0), 'perc_sw'] = reallocate_df['xs_sw'] / reallocate_df['xs_total']
+    abm = pd.merge(abm, reallocate_df[['nldas', 'perc_gw','perc_sw']], how='left',on='nldas')
+    abm['xs_gw_reallo'] = abm['xs_total'] * abm['perc_gw']
+    abm['xs_sw_reallo'] = abm['xs_total'] * abm['perc_sw']
+    # aggregation_functions = {'calc_area': 'sum'}
+    aggregation_functions = {'xs_sw_reallo': 'sum'}
     if year == 0:
         abm = pd.merge(abm, huc2[['NLDAS_ID', 'NAME']], how='left',left_on='nldas',right_on='NLDAS_ID')
         abm = pd.merge(abm, states_etc[['COUNTYFP','ERS_region','State','NLDAS_ID']],how='left',left_on='nldas',right_on='NLDAS_ID')
@@ -50,6 +62,7 @@ for year in range(70): # change back to 70
 abm_summary['Join'] = 1
 sigmoid = pd.read_csv('AreaBumpModelv3.csv')
 abm_summary = pd.merge(abm_summary, sigmoid, on='Join', how='inner')
-abm_summary = abm_summary.rename(columns={"crop": "Sub-category", "NAME": "_Category", "calc_area": "Total", "year": "Year"})
+abm_summary = abm_summary.rename(columns={"crop": "Sub-category", "NAME": "_Category", "xs_sw_reallo": "Total", "year": "Year"})
+# abm_summary = abm_summary.rename(columns={"crop": "Sub-category", "NAME": "_Category", "calc_area": "Total", "year": "Year"})
 abm_summary['Total'] = abm_summary['Total'] / 1000  # correct areas to be in appropriate unit (acres)
-abm_summary.to_csv('abm_join_sigmoid_adaptonly.csv', index=False)
+abm_summary.to_csv('abm_join_sigmoid_NCrev.csv', index=False)

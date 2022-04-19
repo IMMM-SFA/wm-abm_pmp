@@ -1,3 +1,5 @@
+# pmp calibrated costs for sw only
+
 import os
 import sys
 global basepath
@@ -17,7 +19,9 @@ import pdb
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201028_GW.xlsx")
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
+#data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
+#data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220311_GW.xlsx")
+data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220323_GW.xlsx")
 data_profit = data_file.parse("Profit")
 data_profit['area_irrigated'] = data_profit['area_irrigated'] * 1000
 data_profit['area_irrigated_gw'] = data_profit['area_irrigated_gw'] * 1000
@@ -257,12 +261,14 @@ for n in [1]:
     net_prices_total_subset = {key: net_prices_total[key] for key in ids_subset_sorted}
     net_prices_sw_subset = {key: net_prices_sw[key] for key in ids_subset_sorted}
     net_prices_gw_subset = {key: net_prices_gw[key] for key in ids_subset_sorted}
+    # net_prices_gw_subset.update((x, y*2) for x, y in net_prices_gw_subset.items())  ### JY TEMP
     gammas_total_subset = {key: gammas_total[key] for key in ids_subset_sorted}
     nirs_subset = {key: nirs[key] for key in ids_subset_sorted}
     alphas_sw_subset = {key: alphas_sw[key] for key in farm_ids_subset}
     gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
     land_constraints_by_farm_subset = {key: land_constraints_by_farm[key] for key in farm_ids_subset}
     water_constraints_by_farm_subset = {key: water_constraints_by_farm[key] for key in farm_ids_subset}
+    # water_constraints_by_farm_subset[36335] = 63026538.58  ### JY TEMP
 
     # set price to zero for gammas that are zero
     for key,value in gammas_total_subset.items():
@@ -311,10 +317,10 @@ for n in [1]:
     def obs_lu_constraint_sum(fwm_s, i):
         return fwm_s.xs_sw[i] + fwm_s.xs_gw[i] == fwm_s.xs_total[i]
     fwm_s.c5 = Constraint(fwm_s.ids, rule=obs_lu_constraint_sum)
-    #
-    # def water_constraint(fwm_s, ff):
-    #     return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i]*1000 for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]
-    # fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=water_constraint)
+
+    def water_constraint(fwm_s, ff):
+        return sum(fwm_s.xs_sw[i]*fwm_s.nirs[i]*1000 for i in fwm_s.crop_ids_by_farm_and_constraint[ff]) <= fwm_s.water_constraints[ff]
+    fwm_s.c2 = Constraint(fwm_s.farm_ids, rule=water_constraint)
 
     ## C.2.c Creating and running the solver:
     # start_time = datetime.datetime.now()
