@@ -11,15 +11,19 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
 # switch to directory with ABM runs
-os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr')
-# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results')
-#
+# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr')
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results')
+
 
 # Load in NLDAS/HUC-2 join table
 huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
+# huc2 = pd.read_csv('/pic/projects/im3/wm/Jim/wm_abm_postprocess/NLDAS_HUC2_join.csv')
 
 # Load in states/counties/regions join table
 states_etc = pd.read_csv('nldas_states_counties_regions.csv')
+# states_etc = pd.read_csv('/pic/projects/im3/wm/Jim/wm_abm_postprocess/nldas_states_counties_regions.csv')
+
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
 
 # Develop csv file for visualizing crop areas in Tableau
 # Load in ABM csv results for cropped areas
@@ -63,7 +67,7 @@ wm_results.to_csv('wm_summary_results_join_v7.csv')
 
 # Read wm_results_summary file for baseline (no abm) and merge with above
 wm_results['experiment'] = 'abm'
-wm_results_noabm = pd.read_csv('wm_summary_results_20220415_noabm 2.csv')
+wm_results_noabm = pd.read_csv('wm_summary_results_20220418_noabm.csv')
 wm_results_noabm = pd.merge(wm_results_noabm, huc2[['NLDAS_ID','NAME']], how='left', on='NLDAS_ID')
 wm_results_noabm = pd.merge(wm_results_noabm, states_etc[['NLDAS_ID','ERS_region','State']], how='left',on='NLDAS_ID')
 wm_results_noabm['experiment'] = 'no abm'
@@ -97,6 +101,7 @@ df_abm = pd.merge(df_abm, df_base, how='left', on='NLDAS_ID')
 df_abm['a_div_b'] = df_abm['abm_demand'] / df_abm['base_demand']
 df_abm = df_abm.fillna(0)
 df_abm = df_abm.replace([np.inf, -np.inf], 0)
+# df_abm.to_csv('abm_div_base_demand_GIS.csv')
 df_abm.to_csv('abm_div_base_demand_GIS.csv')
 
 # Calculate max shortage difference between abm and no abm (for visualization in QGIS)
@@ -114,11 +119,25 @@ df_abm = pd.merge(df_abm, df_base, how='left', on='NLDAS_ID')
 df_abm['shoratge_diff_abs'] = (df_abm['abm_shortage']) - (df_abm['base_shortage'])
 df_abm.to_csv('abm_max_shortage_diff_abs_GIS.csv')
 
+# Calculate max shortage difference between abm and no abm (for visualization in QGIS - Nature Comms Revision)
+wm_results['shortage_abm'] = wm_results['WRM_DEMAND0'] - wm_results['WRM_SUPPLY']
+wm_results_noabm['shortage_noabm'] = wm_results_noabm['WRM_DEMAND0'] - wm_results_noabm['WRM_SUPPLY']
+aggregation_functions = {'shortage_abm': 'max'}
+wm_results_max = wm_results.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
+aggregation_functions = {'shortage_noabm': 'max'}
+wm_results_noabm_max = wm_results_noabm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
+wm_results_compare = pd.merge(wm_results_max, wm_results_noabm_max, how='left', on='NLDAS_ID')
+wm_results_compare['abm_shortage_div_base'] = wm_results_compare['shortage_abm'] / wm_results_compare['shortage_noabm']
+wm_results_compare = wm_results_compare.dropna()
+wm_results_compare['abm_shortage_div_base'] = wm_results_compare['abm_shortage_div_base'].replace([np.inf, -np.inf], 10)
+wm_results_compare.to_csv('abm_max_shortage_abm_div_base_NCrev2.csv')
+
 # Calculate the max level of shortage per NLDAS grid cell
 wm_results['shortage_perc'] = 1.0 - (wm_results['WRM_SUPPLY'] / wm_results['WRM_DEMAND0'])
 wm_results = wm_results[(wm_results.year>=1950)]
 wm_results = wm_results.fillna(0)
 wm_results_max_shortage = wm_results.loc[wm_results.groupby("NLDAS_ID")["shortage_perc"].idxmax()]
+
 
 # Calculate the avg demand and take difference between abm run and no abm run
 wm_results = wm_results[(wm_results.year>=1950)]
@@ -151,6 +170,10 @@ wm_results_sum_noabm = wm_results_noabm.groupby(['NAME', 'year'], as_index=False
 wm_results_sum_noabm = wm_results_sum_noabm.rename(columns={"shortage": "shortage_noabm"})
 wm_results_difference = pd.merge(wm_results_sum[['NLDAS_ID','NAME','State','shortage_abm','year']], wm_results_sum_noabm[['NAME','shortage_noabm','year']], how='left', on=['NAME','year'])
 wm_results_difference['shortage_diff'] = wm_results_difference['shortage_abm'] - wm_results_difference['shortage_noabm']
+wm_results_difference['Region'] = wm_results_difference['NAME']
+wm_results_difference['Direction'] = 'Positive'
+wm_results_difference.loc[wm_results_difference['shortage_diff'] < 0, 'Direction'] = 'Negative'
+wm_results_difference.to_csv('abm_shortage_comp_region_NCrev_2.csv')
 
 # Calculate the max level of shortage and take difference between abm run and no abm run
 wm_results['shortage_perc_abm'] = 1.0 - (wm_results['WRM_SUPPLY'] / wm_results['WRM_DEMAND0'])
@@ -194,8 +217,11 @@ abm_change['change_short'] = np.where(abm_change['1985_crop'] != abm_change['199
 abm_change[(abm_change['change_short']=='No Change')].__len__()
 
 # Combine agent adaptivity classification and water shortage metrics
-adapt = pd.read_csv('abm_output_classification_mem02_corr_v2.csv')
-wm = pd.read_csv('wm_results_noabm_compare_mem02_corr.csv')
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
+# adapt = pd.read_csv('abm_output_classification_mem02_corr_v2.csv')
+# wm = pd.read_csv('wm_results_noabm_compare_mem02_corr.csv')
+adapt = pd.read_csv('abm_output_classification_NCrev.csv')
+wm = pd.read_csv('wm_summary_results_20220418_abm.csv')
 wm = wm[(wm.experiment=='abm')]
 wm['shortage'] = (wm['WRM_DEMAND0'] - wm['WRM_SUPPLY']) / wm['WRM_DEMAND0']
 aggregation_functions = {'shortage': 'max'}
@@ -203,7 +229,7 @@ wm_group = wm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functi
 wm_group['shortage_class'] = np.where((wm_group['shortage'] >= 0.1), 'yes', 'no')
 adapt = pd.merge(adapt, wm_group, how='left',left_on='nldas',right_on='NLDAS_ID')
 adapt = adapt[(adapt.shortage_class == 'yes')]
-adapt.to_csv('shortage_only_cells_10perc_thres.csv')
+adapt.to_csv('shortage_only_cells_10perc_thres_NCrev.csv')
 
 # Sensitivity shortage results normalized by baseline value and rank ordered
 sens = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc.csv')
@@ -230,6 +256,19 @@ sens['shortage_perc_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_per
 sens = sens.replace([np.inf, -np.inf], np.nan)
 sens = sens.fillna(0)
 sens.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\abm_sensitivity_shortage_comp_perc_ranked.csv')
+
+# Sensitivity shortage results (not normalized by baseline value) and rank ordered ### NC Revision
+sens = pd.read_csv('abm_sensitivity_shortage_comp_perc_NCrev.csv')
+base = sens[(sens.sen_run=='base')]
+base['rank'] = base.groupby("NAME")["shortage_perc"].rank("dense", ascending=False)
+base = base[['year','NAME','shortage_perc','rank']]
+base.rename(columns={'shortage_perc':'shortage_perc_base', 'rank':'rank_base'}, inplace=True)
+sens = pd.merge(sens, base, how='left', on=['year','NAME'])
+sens['shortage_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base'])
+sens['shortage_perc_diff_to_base'] = (sens['shortage_perc'] - sens['shortage_perc_base']) / sens['shortage_perc_base']
+sens = sens.replace([np.inf, -np.inf], np.nan)
+sens = sens.fillna(0)
+sens.to_csv('abm_sensitivity_shortage_comp_perc_ranked_NCrev.csv')
 
 ##### Working section
 

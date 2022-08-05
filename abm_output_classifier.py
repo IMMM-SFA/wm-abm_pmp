@@ -20,6 +20,8 @@ huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
 # Load in states/counties/regions join table
 states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
+
 for year in range(60):
     print(str(year))
     abm = pd.read_csv('abm_results_' + str(year+1950))

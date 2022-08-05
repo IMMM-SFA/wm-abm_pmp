@@ -518,3 +518,27 @@ with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/sw_cal
     sw_constraints_by_farm = pickle.load(fp)
 with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
     gw_constraints_by_farm = pickle.load(fp)
+
+
+import pandas as pd
+
+abm_old = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\202104 Mem 02 Corr\\wm_results_noabm_compare_mem02_corr.csv')
+
+aggregation_functions = {'shortage_calc': 'sum'}
+abm_summary_old = abm_old.groupby(['year','experiment'], as_index=False).aggregate(aggregation_functions)
+abm_summary_old_abm = abm_summary_old[abm_summary_old.experiment=='abm']
+abm_summary_old_noabm = abm_summary_old[abm_summary_old.experiment=='no abm']
+abm_old_merge = pd.merge(abm_summary_old_abm, abm_summary_old_noabm, how='left',left_on='year',right_on='year')
+abm_old_merge['shortage_change_perc'] = (abm_old_merge['shortage_calc_x'] - abm_old_merge['shortage_calc_y']) / abm_old_merge['shortage_calc_y']
+
+abm_new_abm = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm\\wm_summary_results_20220418_abm.csv')
+abm_new_noabm = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm\\wm_summary_results_20220418_noabm.csv')
+
+abm_new_abm['shortage_calc'] = abm_new_abm['WRM_DEMAND0'] - abm_new_abm['WRM_SUPPLY']
+abm_new_noabm['shortage_calc'] = abm_new_noabm['WRM_DEMAND0'] - abm_new_noabm['WRM_SUPPLY']
+
+aggregation_functions = {'shortage_calc': 'sum'}
+abm_summary_new_abm = abm_new_abm.groupby(['year'], as_index=False).aggregate(aggregation_functions)
+abm_summary_new_noabm = abm_new_noabm.groupby(['year'], as_index=False).aggregate(aggregation_functions)
+abm_new_merge = pd.merge(abm_summary_new_abm, abm_summary_new_noabm, how='left',left_on='year',right_on='year')
+abm_new_merge['shortage_change_perc'] = (abm_new_merge['shortage_calc_x'] - abm_new_merge['shortage_calc_y']) / abm_new_merge['shortage_calc_y']
