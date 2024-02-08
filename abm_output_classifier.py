@@ -20,7 +20,9 @@ huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
 # Load in states/counties/regions join table
 states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 
-os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
+# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
+# os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem02 v2')
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem02 v3')
 
 for year in range(60):
     print(str(year))
@@ -97,4 +99,6 @@ abm_min_max.loc[(abm_min_max['min_sum_area'] / abm_min_max['max_sum_area'] < 0.8
 abm_min_max.loc[(abm_min_max['sum_area_avg'] < threshold_acres), 'classification'] = 'no ag'
 
 # abm_min_max.to_csv('abm_output_classification_mem02_corr_v2.csv')
-abm_min_max.to_csv('abm_output_classification_NCrev.csv')
+# abm_min_max.to_csv('abm_output_classification_NCrev.csv')
+# abm_min_max.to_csv('abm_output_classification_NCrev2_20230201.csv')
+abm_min_max.to_csv('abm_output_classification_NCrev2_20230216.csv')

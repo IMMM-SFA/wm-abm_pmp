@@ -51,15 +51,19 @@ def calc_demand(year, month):
 
             ## Read in Water Availability Files from MOSART-PMP
             if year_int<=1940:  # If year is before 1950 (warm-up period), use the external baseline water demand files
-                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv') # Use baseline water demand data for warmup period
-                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
-                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol'].to_dict()
+                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
+                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID', 'sw_irrigation_vol_month']].reset_index()
+                aggregation_functions = {'sw_irrigation_vol_month': 'sum'}
+                sw_constraints_by_farm = sw_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
+                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol_month'].to_dict()
             elif year_int<1950:
                 return None
             elif year_int==1950:  # For first year of ABM, use baseline water demand data
-                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv')
-                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol']].reset_index()
-                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol'].to_dict()
+                sw_constraints_by_farm = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
+                sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol_month']].reset_index()
+                aggregation_functions={'sw_irrigation_vol_month': 'sum'}
+                sw_constraints_by_farm = sw_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
+                sw_constraints_by_farm = sw_constraints_by_farm['sw_irrigation_vol_month'].to_dict()
             else:
 
                 #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
@@ -121,30 +125,34 @@ def calc_demand(year, month):
                 abm_supply_avail = abm_supply_avail.fillna(0)
 
                 # convert units from m3/s to acre-ft/yr
-                mu = 0.2 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
+                mu = 0.6 # mu defines the agents "memory decay rate" - higher mu values indicate higher decay (e.g., 1 indicates that agent only remembers previous year)
 
                 if year == '1951':
-                    hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20220223.csv')
-                    hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreft_OG']
+                    hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_20230112.csv')
+                    aggregation_functions = {'WRM_SUPPLY_acreftmth_OG': 'sum', 'sw_avail_bias_corr': 'sum',
+                                             'RIVER_DISCHARGE_OVER_LAND_LIQ_OG': 'mean'}
+                    hist_avail_bias = hist_avail_bias.groupby(['NLDAS_ID'], as_index=False).aggregate(
+                        aggregation_functions)
+                    hist_avail_bias['WRM_SUPPLY_acreft_prev'] = hist_avail_bias['WRM_SUPPLY_acreftmth_OG']
                 else:
                     hist_avail_bias = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
 
-                hist_storage = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_dependent_storage.csv')
+                hist_storage = pd.read_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_dependent_storage_20230112.csv')
                 hist_avail_bias = pd.merge(hist_avail_bias, hist_storage, how='left', on='NLDAS_ID')
 
-                abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
+                abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreftmth_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
                 abm_supply_avail['demand_factor'] = abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG']
                 abm_supply_avail['demand_factor'] = np.where(abm_supply_avail['STORAGE_SUM_OG'] > 0, abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG'],
                                                              np.where(abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'] >= 0.1,
                                                                       abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ'] / abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'],
                                                                       1))
 
-                abm_supply_avail['WRM_SUPPLY_acreft_newinfo'] = abm_supply_avail['demand_factor'] * abm_supply_avail['WRM_SUPPLY_acreft_OG']
+                abm_supply_avail['WRM_SUPPLY_acreft_newinfo'] = abm_supply_avail['demand_factor'] * abm_supply_avail['WRM_SUPPLY_acreftmth_OG']
 
                 abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft_newinfo'])
 
                 abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
-                abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor','RIVER_DISCHARGE_OVER_LAND_LIQ_OG']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
+                abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreftmth_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor','RIVER_DISCHARGE_OVER_LAND_LIQ_OG']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
                 abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'] = abm_supply_avail['WRM_SUPPLY_acreft_updated'] + abm_supply_avail['sw_avail_bias_corr']
                 sw_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
                 logging.info('Successfully converted units df for month, year: ' + month + ' ' + year)
@@ -204,6 +212,7 @@ def calc_demand(year, month):
             ## C.2.a. Constructing model inputs:
             ##  (repetition to be safe - deepcopy does not work on PYOMO models)
             chunk_size = 555  # JY: for a total of 97 chunks (53,835 farms / 555)
+            # chunk_size = 185  # JY: for a total of 97 chunks (53,835 farms / 555)
             no_of_chunks = len(farm_ids) / chunk_size
 
             first = True
@@ -324,21 +333,28 @@ def calc_demand(year, month):
                     opt = SolverFactory("ipopt", solver_io='nl')
                     results = opt.solve(fwm_s, keepfiles=False, tee=True)
                     print(results.solver.termination_condition)
+                    print(year)  # !!JY TEMP!!
                 except:
-                    logging.info('Pyomo model solve has failed for month, year: ' + month + ' ' + year)
+                    logging.info('Pyomo model solve has failed for month, year: ' + month + ' ' + year, ' chunk: ' + str(n))
 
                 ## D.1. Storing main model outputs:
                 result_xs_sw = dict(fwm_s.xs_sw.get_values())
                 result_xs_gw = dict(fwm_s.xs_gw.get_values())
                 result_xs_total = dict(fwm_s.xs_total.get_values())
                 logging.info('Extracted results from Pyomo')
+                # print('extracted xs_sw is: ' + str(sum(result_xs_sw.values())))
+                # print('extracted xs_gw is: ' + str(sum(result_xs_gw.values())))
+                # print('extracted xs_total is: ' + str(sum(result_xs_total.values())))
 
                 # convert result_xs_sw to pandas dataframe and join to data_profit
                 if first is True:
                     results_pd = data_profit
-                    results_pd['xs_gw'] = 0
-                    results_pd['xs_sw'] = 0
-                    results_pd['xs_total'] = 0
+                    # results_pd['xs_gw'] = 0
+                    # results_pd['xs_sw'] = 0
+                    # results_pd['xs_total'] = 0
+                    results_pd['xs_gw'] = results_pd['area_irrigated_gw'] * 1000.0 # revert to baseline / calibration value if optimizaiton fails
+                    results_pd['xs_sw'] = results_pd['area_irrigated_sw'] * 1000.0
+                    results_pd['xs_total'] = results_pd['area_irrigated'] * 1000.0
                     results_pd['id'] = results_pd['index']
                     first = False
                 results_xs_sw_pd = pd.DataFrame.from_dict(result_xs_sw, orient='index')
@@ -411,14 +427,14 @@ def calc_demand(year, month):
                         ratio_ds  = xr.open_dataset('/pic/projects/im3/wm/Jim/pmp_input_files/monthly_irr_ratios/USGS_irr_ratios_' + month + '.nc' )
                         ratio_ds = ratio_ds.ratio
                         ratio_df = ratio_ds.to_dataframe()
-                        ratio_df = ratio_df.dropna().reset_index()
-                        df_nc = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
-                        df_nc['totalDemand_adj'] = df_nc['totalDemand'] * df_nc['ratio'] / (1.0 / 12.0)
+                        ratio_df = ratio_df.fillna(0).reset_index()
+                        df_nc_write = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
+                        df_nc_write['totalDemand_adj'] = df_nc_write['totalDemand'] * df_nc_write['ratio'] / (1.0 / 12.0)
                         year_out = year_int + yr + 1
                         str_year = str(year_out)
                         new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
                         shutil.copyfile(file, new_fname)
-                        demand_ABM = df_nc.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
+                        demand_ABM = df_nc_write.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
                         with netCDF4.Dataset(new_fname,'a') as nc:
                             nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 
@@ -427,13 +443,13 @@ def calc_demand(year, month):
                     ratio_ds  = xr.open_dataset('/pic/projects/im3/wm/Jim/pmp_input_files/monthly_irr_ratios/USGS_irr_ratios_' + month + '.nc' )
                     ratio_ds = ratio_ds.ratio
                     ratio_df = ratio_ds.to_dataframe()
-                    ratio_df = ratio_df.dropna().reset_index()
-                    df_nc = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
-                    df_nc['totalDemand_adj'] = df_nc['totalDemand'] * df_nc['ratio'] / (1.0 / 12.0)
+                    ratio_df = ratio_df.fillna(0).reset_index()
+                    df_nc_write = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
+                    df_nc_write['totalDemand_adj'] = df_nc_write['totalDemand'] * df_nc_write['ratio'] / (1.0 / 12.0)
                     str_year = str(year_int)
                     new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
                     shutil.copyfile(file, new_fname)
-                    demand_ABM = df_nc.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
+                    demand_ABM = df_nc_write.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
                     with netCDF4.Dataset(new_fname,'a') as nc:
                         nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 

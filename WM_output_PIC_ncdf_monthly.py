@@ -19,7 +19,7 @@ for year in range(70):
     print(str(year))
     for m in months:
         year_str = str(year+1940)
-        ds = xr.open_dataset('/pic/scratch/yoon644/csmruns/wm_abm_run/run/mem08_20230219/wm_abm_run.mosart.h0.' + year_str + '-' + m + '.nc')
+        ds = xr.open_dataset('/pic/scratch/yoon644/csmruns/wm_abm_run/run/baselinerun_20230213/wm_abm_run.mosart.h0.' + year_str + '-' + m + '.nc')
         df = ds.to_dataframe()
         df = df[['WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE','GINDEX']]
         df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
@@ -28,18 +28,16 @@ for year in range(70):
         df_merge = df_merge.dropna()
         df_merge = df_merge.drop_duplicates()
         df_merge = df_merge[['WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE','NLDAS_ID','NAME','State','ERS_region','COUNTYFP','GINDEX']]
-        if m == '01':
-            df_append = df_merge
+        df_merge['shortage'] = df_merge['WRM_DEMAND0'] - df_merge['WRM_SUPPLY']
+        df_merge['year'] = year+1940
+        df_merge['month'] = int(m)
+        aggregation_functions = {'WRM_SUPPLY': 'sum', 'WRM_DEMAND0': 'sum', 'RIVER_DISCHARGE_OVER_LAND_LIQ': 'mean',
+                                 'WRM_STORAGE': 'mean', 'shortage': 'sum', 'State': 'first', 'ERS_region': 'first',
+                                 'COUNTYFP': 'first', 'GINDEX': 'first'}
+        df_summary = df_merge.groupby(['NAME', 'year', 'month'], as_index=False).aggregate(aggregation_functions)
+        if year == 0 and m == '01':
+            df_append = df_summary
         else:
-            df_append = df_append.append(df_merge)
-    if year == 0:
-        aggregation_functions = {'WRM_SUPPLY': 'mean','WRM_DEMAND0': 'mean','RIVER_DISCHARGE_OVER_LAND_LIQ': 'mean','WRM_STORAGE': 'mean','NAME': 'first', 'State': 'first', 'ERS_region': 'first', 'COUNTYFP': 'first', 'GINDEX': 'first'}
-        df_summary = df_append.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
-        df_summary['year'] = year+1940
-    else:
-        aggregation_functions = {'WRM_SUPPLY': 'mean','WRM_DEMAND0': 'mean','RIVER_DISCHARGE_OVER_LAND_LIQ': 'mean','WRM_STORAGE': 'mean','NAME': 'first', 'State': 'first', 'ERS_region': 'first', 'COUNTYFP': 'first',  'GINDEX': 'first'}
-        df_summary_toappend = df_append.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
-        df_summary_toappend['year'] = year+1940
-        df_summary = df_summary.append(df_summary_toappend)
+            df_append = df_append.append(df_summary)
 
-df_summary[['year','NLDAS_ID','WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE', 'GINDEX']].to_csv('wm_summary_results_mem08run_20230219.csv')
+df_append[['NAME','year','month','WRM_SUPPLY','WRM_DEMAND0','RIVER_DISCHARGE_OVER_LAND_LIQ','WRM_STORAGE','shortage', 'GINDEX']].to_csv('wm_summary_results_baselinerun_monthly_20230213.csv')

@@ -73,6 +73,28 @@ mem_comp = mem_comp[(mem_comp.year >= 1950)]
 mem_comp['year'] = mem_comp['year'] - 1949
 #mem_comp['shortage_perc'] = (mem_comp['WRM_DEMAND0'] - mem_comp['WRM_SUPPLY']) / mem_comp['WRM_DEMAND0']
 
+#### Generate Shortage Comparison Plots / NC Revision #2 (2/20/2023) ####
+# switch to directory with ABM mem 02 run
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\baseline v2')
+base = pd.read_csv('wm_summary_results_baselinerun_20230213.csv')
+base['sen_run'] = 'base'
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem02 v3')
+mem02 = pd.read_csv('wm_summary_results_abmrun_20230206.csv')
+mem02['sen_run'] = 'mem02'
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem04')
+mem04 = pd.read_csv('wm_summary_results_mem04run_20230219.csv')
+mem04['sen_run'] = 'mem04'
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem06')
+mem06 = pd.read_csv('wm_summary_results_mem06run_20230219.csv')
+mem06['sen_run'] = 'mem06'
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem08')
+mem08 = pd.read_csv('wm_summary_results_mem08run_20230219.csv')
+mem08['sen_run'] = 'mem08'
+mem_comp = pd.concat([base, mem02, mem04, mem06, mem08], ignore_index=True)
+mem_comp = mem_comp[(mem_comp.year >= 1950)]
+mem_comp['year'] = mem_comp['year'] - 1949
+#mem_comp['shortage_perc'] = (mem_comp['WRM_DEMAND0'] - mem_comp['WRM_SUPPLY']) / mem_comp['WRM_DEMAND0']
+
 # sum supplies and demands at the HUC-2 basin level
 os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
 huc2 = pd.read_csv('NLDAS_HUC2_join.csv')
@@ -80,7 +102,8 @@ mem_comp = pd.merge(mem_comp, huc2[['NLDAS_ID','NAME']], how='left',on='NLDAS_ID
 aggregation_functions = {'WRM_SUPPLY': 'sum', 'WRM_DEMAND0': 'sum'}
 mem_comp_summary = mem_comp.groupby(['year','NAME','sen_run'], as_index=False).aggregate(aggregation_functions)
 mem_comp_summary['shortage_perc'] = (mem_comp_summary['WRM_DEMAND0'] - mem_comp_summary['WRM_SUPPLY']) / mem_comp_summary['WRM_DEMAND0']
-mem_comp_summary.to_csv('abm_sensitivity_shortage_comp_perc_NCrev.csv')
+# mem_comp_summary.to_csv('abm_sensitivity_shortage_comp_perc_NCrev.csv')
+mem_comp_summary.to_csv('abm_sensitivity_shortage_comp_perc_NCrev2_20230220.csv')
 
 # only grab cells with shortage > 0 for at least 1 sensitivity run for at least 1 year
 aggregation_functions = {'shortage_perc': 'mean'}

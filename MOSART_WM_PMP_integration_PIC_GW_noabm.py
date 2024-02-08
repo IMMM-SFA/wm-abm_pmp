@@ -242,9 +242,9 @@ def calc_demand(year, month):
                     # convert result_xs_sw to pandas dataframe and join to data_profit
                     if first is True:
                         results_pd = data_profit
-                        results_pd['xs_gw'] = 0
-                        results_pd['xs_sw'] = 0
-                        results_pd['xs_total'] = 0
+                        results_pd['xs_gw'] = results_pd['area_irrigated_gw'] * 1000.0 # revert to baseline / calibration value if optimization fails
+                        results_pd['xs_sw'] = results_pd['area_irrigated_sw'] * 1000.0
+                        results_pd['xs_total'] = results_pd['area_irrigated'] * 1000.0
                         results_pd['id'] = results_pd['index']
                         first = False
                     results_xs_sw_pd = pd.DataFrame.from_dict(result_xs_sw, orient='index')
@@ -314,20 +314,32 @@ def calc_demand(year, month):
                 if year_int<=1940:
                     for yr in range(70):
                         for month in months:
+                            ratio_ds  = xr.open_dataset('/pic/projects/im3/wm/Jim/pmp_input_files/monthly_irr_ratios/USGS_irr_ratios_' + month + '.nc' )
+                            ratio_ds = ratio_ds.ratio
+                            ratio_df = ratio_ds.to_dataframe()
+                            ratio_df = ratio_df.fillna(0).reset_index()
+                            df_nc_ratio = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
+                            df_nc_ratio['totalDemand_adj'] = df_nc_ratio['totalDemand'] * df_nc_ratio['ratio'] / (1.0 / 12.0)
                             year_out = year_int + yr + 1
                             str_year = str(year_out)
                             new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
                             shutil.copyfile(file, new_fname)
-                            demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
+                            demand_ABM = df_nc_ratio.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
                             with netCDF4.Dataset(new_fname,'a') as nc:
                                 nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 
                 else:
                     for month in months:
+                        ratio_ds  = xr.open_dataset('/pic/projects/im3/wm/Jim/pmp_input_files/monthly_irr_ratios/USGS_irr_ratios_' + month + '.nc' )
+                        ratio_ds = ratio_ds.ratio
+                        ratio_df = ratio_ds.to_dataframe()
+                        ratio_df = ratio_df.fillna(0).reset_index()
+                        df_nc_ratio = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
+                        df_nc_ratio['totalDemand_adj'] = df_nc_ratio['totalDemand'] * df_nc_ratio['ratio'] / (1.0 / 12.0)
                         str_year = str(year_int)
                         new_fname = '/pic/projects/im3/wm/Jim/pmp_input_files/demand_input/RCP8.5_GCAM_water_demand_'+ str_year + '_' + month + '.nc' # define ABM demand input directory
                         shutil.copyfile(file, new_fname)
-                        demand_ABM = df_nc.totalDemand.values.reshape(len(lat),len(lon),order='C')
+                        demand_ABM = df_nc_ratio.totalDemand_adj.values.reshape(len(lat),len(lon),order='C')
                         with netCDF4.Dataset(new_fname,'a') as nc:
                             nc['totalDemand'][:] = np.ma.masked_array(demand_ABM,mask=nc['totalDemand'][:].mask)
 

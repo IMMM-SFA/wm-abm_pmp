@@ -25,8 +25,12 @@ states_etc = pd.read_csv('nldas_states_counties_regions.csv')
 # os.chdir('C:\\Users\\yoon644\\Desktop\\corrected test')
 os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm')
 
+
 # read in PMP input files for profit calc
 pmp = pd.read_excel('MOSART_WM_PMP_inputs_20220323_GW.xlsx')
+
+os.chdir('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\wm abm data\\wm abm results\\ABM runs\\20230115 ABM runs\\mem02 v3')
+
 with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm\\gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
     gammas_total = pickle.load(fp)
 with open('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\results\\20220420 abm\\net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
@@ -66,3 +70,6 @@ for year in range(60):
 
 abm_pmp_summary = pd.merge(abm_pmp_summary, huc2[['NLDAS_ID', 'NAME']], how='left',left_on='nldas',right_on='NLDAS_ID')
 abm_pmp_summary['profit_calc'] = abm_pmp_summary['profit_calc'] / 1000
+abm_pmp_summary.to_csv('profit_for_HESS_rev_20231120.csv')
+
+abm_pmp_summary = pd.merge(abm_pmp_summary, states_etc, on='NLDAS_ID')

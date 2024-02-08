@@ -542,3 +542,190 @@ abm_summary_new_abm = abm_new_abm.groupby(['year'], as_index=False).aggregate(ag
 abm_summary_new_noabm = abm_new_noabm.groupby(['year'], as_index=False).aggregate(aggregation_functions)
 abm_new_merge = pd.merge(abm_summary_new_abm, abm_summary_new_noabm, how='left',left_on='year',right_on='year')
 abm_new_merge['shortage_change_perc'] = (abm_new_merge['shortage_calc_x'] - abm_new_merge['shortage_calc_y']) / abm_new_merge['shortage_calc_y']
+
+####################################
+
+import numpy as np
+import xarray as xr
+import matplotlib.pyplot as plt
+
+ds=xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\USGS_irr_ratios_monthly_v2\\USGS_irr_ratios_07.nc')
+ds = ds.ratio
+df = ds.to_dataframe()
+df = df.dropna().reset_index()
+
+plt.contourf(ds['ratio'][:,:])
+plt.colorbar()
+
+df = ds['ratio'].to_pandas()
+
+#####################################
+
+# read a sample water demand input file
+file = 'C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\USGS_irr_ratios_monthly\\USGS_irr_ratios_08.nc'
+with netCDF4.Dataset(file, 'r') as nc:
+    # for key, var in nc.variables.items():
+    #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
+
+    lat = nc['lat'][:]
+    lon = nc['lon'][:]
+    ratio = nc['ratio'][:]
+
+# read NLDAS grid reference file
+df_grid = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_pmp\\data_inputs\\NLDAS_Grid_Reference.csv')
+
+df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
+
+df_grid = df_grid.rename(columns={"CENTERX": "longitude", "CENTERY": "latitude"})
+df_grid['longitude'] = df_grid.longitude + 360
+
+# match netCDF demand file and datagrame
+mesh_lon, mesh_lat = np.meshgrid(lon, lat)
+df_nc = pd.DataFrame({'lon': mesh_lon.reshape(-1, order='C'), 'lat': mesh_lat.reshape(-1, order='C')})
+df_nc['NLDAS_ID'] = [
+    'x' + str(int((row['lon'] - 235.0625) / 0.125 + 1)) + 'y' + str(int((row['lat'] - 25.0625) / 0.125 + 1)) for _, row
+    in df_nc.iterrows()]
+df_nc['totalDemand'] = 0
+
+# use NLDAS_ID as index for both dataframes
+df_nc = df_nc.set_index('NLDAS_ID', drop=False)
+try:
+    results_pivot = results_pivot.set_index('nldas', drop=False)
+except KeyError:
+    pass
+
+# read ABM values into df_nc basing on the same index
+df_nc.loc[results_pivot.index,'totalDemand'] = results_pivot.calc_sw_demand.values
+
+#
+df_merge = pd.merge(df, df_grid, how='left', left_on=['lat', 'lon'], right_on=['latitude', 'longitude'])
+df_merge = df_merge.dropna()
+
+ratio_ds=xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\Paper #1\\Nature Communications submission\\Revision\\USGS_irr_ratios_monthly_v2\\USGS_irr_ratios_07.nc')
+ratio_ds = ratio_ds.ratio
+ratio_df = ratio_ds.to_dataframe()
+ratio_df = ratio_df.dropna().reset_index()
+df_nc = pd.merge(df_nc, ratio_df, how='left', left_on=['lat', 'lon'], right_on=['lat', 'lon'])
+df_nc['totalDemand_adj'] = df_nc['totalDemand'] * df_nc['ratio'] / (1.0/12.0)
+
+###############################
+
+pic_input_dir = './local_debug/demand_input/'
+
+# loop through .nc files and extract data
+first = True
+for m in months:
+    # dataset_name = 'jim_abm_integration.mosart.h0.' + str(year-1) + '-' + m + '.nc'
+    logging.info('Trying to load WM output for month, year: ' + month + ' ' + year)
+    dataset_name = 'wm_abm_run.mosart.h0.' + str(year_int - 1) + '-' + m + '.nc'
+    logging.info('Successfully load WM output for month, year: ' + month + ' ' + year)
+    ds = xr.open_dataset(pic_input_dir+dataset_name)
+    # ds = xr.open_dataset('./data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc')
+    df = ds.to_dataframe()
+    logging.info('Successfully converted to df for month, year: ' + month + ' ' + year)
+    df = df.reset_index()
+    df_merge = pd.merge(df, nldas, how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
+    logging.info('Successfully merged df for month, year: ' + month + ' ' + year)
+    df_select = df_merge[['NLDAS_ID', 'WRM_DEMAND0', 'WRM_SUPPLY', 'WRM_DEFICIT', 'WRM_STORAGE', 'GINDEX',
+                          'RIVER_DISCHARGE_OVER_LAND_LIQ']]
+    logging.info('Successfully subsetted df for month, year: ' + month + ' ' + year)
+    df_select['year'] = year_int
+    df_select['month'] = int(m)
+    if first:
+        df_all = df_select
+        first = False
+    else:
+        df_all = pd.concat([df_all, df_select])
+    logging.info('Successfully concatenated df for month, year: ' + month + ' ' + year)
+
+# calculate average across timesteps
+# df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID','GINDEX'], values=['WRM_SUPPLY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ'],
+#                           aggfunc=np.mean)  # units will be average monthly (m3/s)
+df_pivot = pd.pivot_table(df_all, index=['NLDAS_ID', 'GINDEX'],
+                          values=['WRM_SUPPLY', 'WRM_STORAGE', 'RIVER_DISCHARGE_OVER_LAND_LIQ'],
+                          aggfunc=np.mean)  # units will be average monthly (m3/s)
+df_pivot = df_pivot.reset_index()
+df_pivot = df_pivot[df_pivot['NLDAS_ID'].isin(nldas_ids)].reset_index()
+df_pivot.fillna(0)
+logging.info('Successfully pivoted df for month, year: ' + month + ' ' + year)
+
+# calculate dependent storage
+ds = xr.open_dataset(
+    'C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\WM Flag Tests\\US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
+dams = ds["DamInd_2d"].to_dataframe()
+dams = dams.reset_index()
+dep = ds["gridID_from_Dam"].to_dataframe()
+dep = dep.reset_index()
+dep_id = ds["unit_ID"].to_dataframe()
+dep_merge = pd.merge(dep, dams, how='left', left_on=['Dams'], right_on=['DamInd_2d'])
+df_pivot = pd.merge(df_pivot, nldas, how='left', on='NLDAS_ID')
+dep_merge = pd.merge(dep_merge,
+                     df_pivot[['NLDAS_ID', 'CENTERX', 'CENTERY', 'WRM_STORAGE', 'RIVER_DISCHARGE_OVER_LAND_LIQ']],
+                     how='left', left_on=['lat', 'lon'], right_on=['CENTERY', 'CENTERX'])
+dep_merge['WRM_STORAGE'] = dep_merge['WRM_STORAGE'].fillna(0)
+
+aggregation_functions = {'WRM_STORAGE': 'sum'}
+dep_merge = dep_merge.groupby(['gridID_from_Dam'], as_index=False).aggregate(aggregation_functions)
+dep_merge.rename(columns={'WRM_STORAGE': 'STORAGE_SUM'}, inplace=True)
+
+wm_results = pd.merge(df_pivot, dep_merge, how='left', left_on=['GINDEX'], right_on=['gridID_from_Dam'])
+abm_supply_avail = wm_results[wm_results['NLDAS_ID'].isin(nldas_ids)].reset_index()
+abm_supply_avail = abm_supply_avail[['WRM_SUPPLY', 'NLDAS_ID', 'STORAGE_SUM', 'RIVER_DISCHARGE_OVER_LAND_LIQ']]
+abm_supply_avail = abm_supply_avail.fillna(0)
+
+hist_storage = pd.read_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects\\wm_netcdf\\hist_dependent_storage_20230103.csv')
+hist_avail_bias = pd.merge(hist_avail_bias, hist_storage, how='left', on='NLDAS_ID')
+
+abm_supply_avail = pd.merge(abm_supply_avail, hist_avail_bias[['NLDAS_ID','sw_avail_bias_corr','WRM_SUPPLY_acreftmth_OG','WRM_SUPPLY_acreft_prev','RIVER_DISCHARGE_OVER_LAND_LIQ_OG','STORAGE_SUM_OG']], on=['NLDAS_ID'])
+abm_supply_avail['demand_factor'] = abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG']
+abm_supply_avail['demand_factor'] = np.where(abm_supply_avail['STORAGE_SUM_OG'] > 0, abm_supply_avail['STORAGE_SUM'] / abm_supply_avail['STORAGE_SUM_OG'],
+                                             np.where(abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'] >= 0.1,
+                                                      abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ'] / abm_supply_avail['RIVER_DISCHARGE_OVER_LAND_LIQ_OG'],
+                                                      1))
+
+abm_supply_avail['WRM_SUPPLY_acreft_newinfo'] = abm_supply_avail['demand_factor'] * abm_supply_avail['WRM_SUPPLY_acreftmth_OG']
+
+abm_supply_avail['WRM_SUPPLY_acreft_updated'] = ((1 - mu) * abm_supply_avail['WRM_SUPPLY_acreft_prev']) + (mu * abm_supply_avail['WRM_SUPPLY_acreft_newinfo'])
+
+abm_supply_avail['WRM_SUPPLY_acreft_prev'] = abm_supply_avail['WRM_SUPPLY_acreft_updated']
+# abm_supply_avail[['NLDAS_ID','WRM_SUPPLY_acreft_OG','WRM_SUPPLY_acreft_prev','sw_avail_bias_corr','demand_factor','RIVER_DISCHARGE_OVER_LAND_LIQ_OG']].to_csv('/pic/projects/im3/wm/Jim/pmp_input_files/hist_avail_bias_correction_live.csv')
+abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'] = abm_supply_avail['WRM_SUPPLY_acreft_updated'] + abm_supply_avail['sw_avail_bias_corr']
+water_constraints_by_farm = abm_supply_avail['WRM_SUPPLY_acreft_bias_corr'].to_dict()
+logging.info('Successfully converted units df for month, year: ' + month + ' ' + year)
+
+logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
+
+
+ratio_ds  = xr.open_dataset('/pic/projects/im3/wm/Jim/pmp_input_files/monthly_irr_ratios/USGS_irr_ratios_12.nc' )
+ratio_ds = ratio_ds.ratio
+ratio_df = ratio_ds.to_dataframe()
+ratio_df = ratio_df.dropna().reset_index()
+ratio_df.head(3)
+
+#########################
+
+ds = xr.open_dataset('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\IM3\\WM Flag Tests\\US_reservoir_8th_NLDAS3_updated_CERF_Livneh_naturalflow.nc')
+dams = ds["DamInd_2d"].to_dataframe()
+dams = dams.reset_index()
+dep = ds["gridID_from_Dam"].to_dataframe()
+dep = dep.reset_index()
+dep_id = ds["unit_ID"].to_dataframe()
+dep_merge = pd.merge(dep, dams, how='left', left_on=['Dams'], right_on=['DamInd_2d'])
+df_pivot = pd.merge(df_pivot, nldas, how='left', on='NLDAS_ID')
+dep_merge = pd.merge(dep_merge, df_pivot[['NLDAS_ID','CENTERX','CENTERY','WRM_STORAGE','RIVER_DISCHARGE_OVER_LAND_LIQ']], how='left', left_on=['lat','lon'], right_on=['CENTERY','CENTERX'])
+dep_merge['WRM_STORAGE'] = dep_merge['WRM_STORAGE'].fillna(0)
+
+#####################
+
+count = 0
+for i in range(land_constraints_by_farm.__len__()):
+    if results_pivot_baseline.iloc[i]['xs_total'] * 1000 >= land_constraints_by_farm[i]:
+        print('UH OH!')
+        print(results_pivot_baseline.iloc[i]['xs_total'])
+        print(land_constraints_by_farm[i])
+        count += 1
+
+count = 0
+for i in range(results_pivot_baseline.__len__()):
+    if results_pivot_baseline.iloc[i]['xs_total'] <= 5000:
+        count += 1
