@@ -16,7 +16,7 @@ import pdb
 
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_v1.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201005.xlsx")
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220323_GW.xlsx")
+data_file=pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_20220323_GW.xlsx")
 data_profit = data_file.parse("Profit")
 data_profit['area_irrigated'] = data_profit['area_irrigated'] * 1000
 data_profit['area_irrigated_gw'] = data_profit['area_irrigated_gw'] * 1000
@@ -39,20 +39,20 @@ crop_ids_by_farm_and_constraint={}
 land_constraints_by_farm={}
 water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
-with open('data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
 # with open('data_inputs/max_land_constr_20201102.p', 'rb') as fp:
 #     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
 # with open('data_inputs/pickles/water_constraints_by_farm_v2.p', 'rb') as fp:
 #     water_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/sw_gw_constr_20220321/sw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/sw_gw_constr_20220321/sw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
     sw_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/sw_gw_constr_20220321/gw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/sw_gw_constr_20220321/gw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
     gw_constraints_by_farm = pickle.load(fp, encoding='latin1')
 
-with open('data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
 
 #Revise to account for removal of "Fodder_Herb category"
@@ -100,167 +100,150 @@ net_prices_gw=dict(enumerate(linear_term_sum_gw))
 x_start_values=dict(enumerate([0.0]*3))
 nirs=dict(water_nirs)
 
+farm_no = 37455
+
+## C.1. Constructing model inputs:
+fwm = ConcreteModel()
+# fwm.ids = Set(initialize=ids)
+fwm.ids = Set(initialize=crop_ids_by_farm[farm_no])
+# fwm.farm_ids = Set(initialize=farm_ids)
+fwm.farm_ids = Set(initialize=range(farm_no,farm_no + 1))
+fwm.crop_ids_by_farm = Set(fwm.farm_ids, initialize=crop_ids_by_farm[farm_no])
+fwm.crop_ids_by_farm_and_constraint = Set(fwm.farm_ids, initialize=crop_ids_by_farm_and_constraint[farm_no])
+keys_to_extract = crop_ids_by_farm[farm_no]
+net_prices_total_subset = {key: net_prices_total[key] for key in keys_to_extract}
+net_prices_sw_subset = {key: net_prices_sw[key] for key in keys_to_extract}
+net_prices_gw_subset = {key: net_prices_gw[key] for key in keys_to_extract}
+gammas_total_subset = {key: gammas_total[key] for key in keys_to_extract}
+nirs_subset = {key: nirs[key] for key in keys_to_extract}
+fwm.net_prices_total = Param(fwm.ids, initialize=net_prices_total_subset, mutable=True)
+fwm.net_prices_sw = Param(fwm.ids, initialize=net_prices_sw_subset, mutable=True)
+fwm.net_prices_gw = Param(fwm.ids, initialize=net_prices_gw_subset, mutable=True)
+fwm.gammas_total = Param(fwm.ids, initialize=gammas_total_subset, mutable=True)
+# fwm.alphas_sw = Param(fwm.farm_ids, initialize=alphas_sw[0], mutable=True)
+# fwm.gammas_sw = Param(fwm.farm_ids, initialize=gammas_sw[0], mutable=True)
+fwm.land_constraints = Param(fwm.farm_ids, initialize=land_constraints_by_farm[farm_no], mutable=True)
+fwm.sw_constraints = Param(fwm.farm_ids, initialize=sw_constraints_by_farm[farm_no], mutable=True)
+fwm.gw_constraints = Param(fwm.farm_ids, initialize=gw_constraints_by_farm[farm_no], mutable=True)
+# fwm.water_constraints = Param(fwm.farm_ids, initialize=water_constraints_by_farm[0], mutable=True)
+fwm.xs_total = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
+fwm.xs_sw = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
+fwm.xs_gw = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
+obs_lu_total = dict(data_profit["area_irrigated"])
+obs_lu_total_subset = {key: obs_lu_total[key] for key in keys_to_extract}
+# obs_lu_total_subset[0] = .001
+# obs_lu_total_subset[107670] = .001
+# obs_lu_total_subset[161505] = .001
+# obs_lu_total_subset[215340] = .001
+# obs_lu_total_subset[269175] = .001
+# obs_lu_total_subset[376845] = .001
+# obs_lu_sw = dict(area_irrigated_sw_farm["area_irrigated_sw"])
+fwm.obs_lu_total_subset = Param(fwm.ids, initialize=obs_lu_total_subset, mutable=True)
+# fwm.obs_lu_sw_subset = Param(fwm.farm_ids, initialize=obs_lu_sw[0] + 0.006, mutable=True)  # JY EDIT
+fwm.nirs = Param(fwm.ids, initialize=nirs_subset, mutable=True)
+
+## C.2. Constructing model functions:
+def obj_fun(fwm):
+    return sum(sum((fwm.net_prices_total[h] * fwm.xs_total[h]) for h in fwm.crop_ids_by_farm[f]) +
+               sum((fwm.net_prices_sw[i] * fwm.xs_sw[i]) for i in fwm.crop_ids_by_farm[f]) +
+               sum((fwm.net_prices_gw[g] * fwm.xs_gw[g]) for g in fwm.crop_ids_by_farm[f]) for f in fwm.farm_ids)  # JY double check this!
+fwm.obj_f = Objective(rule=obj_fun, sense=maximize)
+
+# JY need to re-implement this
+# def land_constraint(fwm, ff):
+#     return sum(fwm.xs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.land_constraints[ff]
+# fwm.c1 = Constraint(fwm.farm_ids, rule=land_constraint)
+
+
+def obs_lu_constraint_total(fwm, i):
+    return fwm.xs_total[i] == fwm.obs_lu_total_subset[i]
+fwm.c3 = Constraint(fwm.ids, rule=obs_lu_constraint_total)
+
+# def obs_lu_constraint_sw(fwm, f):
+    # return sum(fwm.xs_sw[i] for i in fwm.crop_ids_by_farm[f]) == fwm.obs_lu_sw_subset[f]
+# fwm.c4 = Constraint(fwm.farm_ids, rule=obs_lu_constraint_sw)
+
+# def obs_lu_constraint_sw(fwm, i):
+#     return fwm.xs_sw[i] == fwm.obs_lu_sw[i]
+# fwm.c4 = Constraint(fwm.ids, rule=obs_lu_constraint_sw)
+
+# def water_constraint(fwm, ff):
+#     return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.water_constraints[ff]
+# fwm.c2 = Constraint(fwm.farm_ids, rule=water_constraint)
+
+def sw_constraint(fwm, ff):
+    return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.sw_constraints[ff]
+fwm.c2 = Constraint(fwm.farm_ids, rule=sw_constraint)
+
+def gw_constraint(fwm, ff):
+    return sum(fwm.xs_gw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.gw_constraints[ff]
+fwm.c6 = Constraint(fwm.farm_ids, rule=gw_constraint)
+
+def obs_lu_constraint_sum(fwm, i):
+    return fwm.xs_sw[i] + fwm.xs_gw[i] == fwm.xs_total[i]
+fwm.c5 = Constraint(fwm.ids, rule=obs_lu_constraint_sum)
+
+fwm.dual = Suffix(direction=Suffix.IMPORT)
+#
+# def water_constraint(fwm, ff):
+#     return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.water_constraints[ff]
+# fwm.c2 = Constraint(fwm.farm_ids, rule=water_constraint)
+
+## C.3. Solve
+opt = SolverFactory("ipopt", solver_io='nl')
+results = opt.solve(fwm, keepfiles=False, tee=True)
+print(results.solver.termination_condition)
+
+## C.1.d. Save duals:
 from pyomo.core import Constraint
-gammas_total_dict = {}
-alphas_total_dict = {}
-net_prices_total_dict = {}
+
+obs_lu_duals_total = dict()
+for c in fwm.component_objects(Constraint, active=True):
+    if str(c) == "c3":
+        cobject = getattr(fwm, str(c))
+        for index in cobject:
+            obs_lu_duals_total[index] = fwm.dual[cobject[index]]
+
+# obs_lu_duals_sw = dict()
+# for c in fwm.component_objects(Constraint, active=True):
+#     if str(c) == "c4":
+#         cobject = getattr(fwm, str(c))
+#         for index in cobject:
+#             obs_lu_duals_sw[index] = fwm.dual[cobject[index]]
+
+# ## C.1.e. 1st stage result: Calculate alpha and gamma:
+# # gamma1 = [((2. * a / b) if (b > 0.0) else 0.0) for a,b in zip(obs_lu_duals.values(),obs_lu.values())]
+# gamma1 = [((a / b) if (b > 0.0) else 0.0) for a, b in zip(obs_lu_duals.values(), obs_lu.values())]
+# alpha1 = [-(0.5 * a * b) for a, b in zip(gamma1, obs_lu.values())]
+# print(alpha1)
+# print("+++ alpha check: +++")
+# print([(a, b) for a, b in zip(alphas, alpha1)])
+# print("+++ gamma check: +++")
+# print([(a, b) for a, b in zip(gammas, gamma1)])
+# alphas = alpha1
+# linear_term_sum=[p*y - c - wc*n - a for p,y,c,wc,n,a in zip(prices,yields,land_costs,sw_costs,water_nirs,alphas)]
+# gammas = dict(enumerate(gamma1))
+# net_prices = dict(enumerate(linear_term_sum))
+
+## C.1.e. 1st stage result: Calculate alpha and gamma:
+# gamma1 = [((2. * a / b) if (b > 0.0) else 0.0) for a,b in zip(obs_lu_duals.values(),obs_lu.values())]
+gamma1_total = [((2. * a / b) if (b > 0.0) else 0.0) for a, b in zip(obs_lu_duals_total.values(), obs_lu_total_subset.values())]
+alpha1_total = [-(0.5 * a * b) for a, b in zip(gamma1_total, obs_lu_total_subset.values())]
+print(alpha1_total)
+print("+++ alpha check: +++")
+print([(a, b) for a, b in zip(alphas_total, alpha1_total)])
+print("+++ gamma check: +++")
+print([(a, b) for a, b in zip(gammas_total, gamma1_total)])
+alphas_total = alpha1_total
 
 
-for farm_no in range(53835):
-
-    ## C.1. Constructing model inputs:
-    print(farm_no)
-    fwm = ConcreteModel()
-    # fwm.ids = Set(initialize=ids)
-    fwm.ids = Set(initialize=crop_ids_by_farm[farm_no])
-    # fwm.farm_ids = Set(initialize=farm_ids)
-    fwm.farm_ids = Set(initialize=range(farm_no,farm_no + 1))
-    fwm.crop_ids_by_farm = Set(fwm.farm_ids, initialize=crop_ids_by_farm[farm_no])
-    fwm.crop_ids_by_farm_and_constraint = Set(fwm.farm_ids, initialize=crop_ids_by_farm_and_constraint[farm_no])
-    keys_to_extract = crop_ids_by_farm[farm_no]
-    net_prices_total_subset = {key: net_prices_total[key] for key in keys_to_extract}
-    net_prices_sw_subset = {key: net_prices_sw[key] for key in keys_to_extract}
-    net_prices_gw_subset = {key: net_prices_gw[key] for key in keys_to_extract}
-    gammas_total_subset = {key: gammas_total[key] for key in keys_to_extract}
-    nirs_subset = {key: nirs[key] for key in keys_to_extract}
-    fwm.net_prices_total = Param(fwm.ids, initialize=net_prices_total_subset, mutable=True)
-    fwm.net_prices_sw = Param(fwm.ids, initialize=net_prices_sw_subset, mutable=True)
-    fwm.net_prices_gw = Param(fwm.ids, initialize=net_prices_gw_subset, mutable=True)
-    fwm.gammas_total = Param(fwm.ids, initialize=gammas_total_subset, mutable=True)
-    # fwm.alphas_sw = Param(fwm.farm_ids, initialize=alphas_sw[0], mutable=True)
-    # fwm.gammas_sw = Param(fwm.farm_ids, initialize=gammas_sw[0], mutable=True)
-    fwm.land_constraints = Param(fwm.farm_ids, initialize=land_constraints_by_farm[farm_no], mutable=True)
-    fwm.sw_constraints = Param(fwm.farm_ids, initialize=sw_constraints_by_farm[farm_no], mutable=True)
-    fwm.gw_constraints = Param(fwm.farm_ids, initialize=gw_constraints_by_farm[farm_no], mutable=True)
-    # fwm.water_constraints = Param(fwm.farm_ids, initialize=water_constraints_by_farm[0], mutable=True)
-    fwm.xs_total = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
-    fwm.xs_sw = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
-    fwm.xs_gw = Var(fwm.ids, domain=NonNegativeReals, initialize=x_start_values)
-    obs_lu_total = dict(data_profit["area_irrigated"])
-    obs_lu_total_subset = {key: obs_lu_total[key] for key in keys_to_extract}
-    # obs_lu_total_subset[0] = .001
-    # obs_lu_total_subset[107670] = .001
-    # obs_lu_total_subset[161505] = .001
-    # obs_lu_total_subset[215340] = .001
-    # obs_lu_total_subset[269175] = .001
-    # obs_lu_total_subset[376845] = .001
-    # obs_lu_sw = dict(area_irrigated_sw_farm["area_irrigated_sw"])
-    fwm.obs_lu_total_subset = Param(fwm.ids, initialize=obs_lu_total_subset, mutable=True)
-    # fwm.obs_lu_sw_subset = Param(fwm.farm_ids, initialize=obs_lu_sw[0] + 0.006, mutable=True)  # JY EDIT
-    fwm.nirs = Param(fwm.ids, initialize=nirs_subset, mutable=True)
-
-    ## C.2. Constructing model functions:
-    def obj_fun(fwm):
-        return sum(sum((fwm.net_prices_total[h] * fwm.xs_total[h]) for h in fwm.crop_ids_by_farm[f]) +
-                   sum((fwm.net_prices_sw[i] * fwm.xs_sw[i]) for i in fwm.crop_ids_by_farm[f]) +
-                   sum((fwm.net_prices_gw[g] * fwm.xs_gw[g]) for g in fwm.crop_ids_by_farm[f]) for f in fwm.farm_ids)  # JY double check this!
-    fwm.obj_f = Objective(rule=obj_fun, sense=maximize)
-
-    # JY need to re-implement this
-    # def land_constraint(fwm, ff):
-    #     return sum(fwm.xs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.land_constraints[ff]
-    # fwm.c1 = Constraint(fwm.farm_ids, rule=land_constraint)
-
-
-    def obs_lu_constraint_total(fwm, i):
-        return fwm.xs_total[i] == fwm.obs_lu_total_subset[i]
-    fwm.c3 = Constraint(fwm.ids, rule=obs_lu_constraint_total)
-
-    # def obs_lu_constraint_sw(fwm, f):
-        # return sum(fwm.xs_sw[i] for i in fwm.crop_ids_by_farm[f]) == fwm.obs_lu_sw_subset[f]
-    # fwm.c4 = Constraint(fwm.farm_ids, rule=obs_lu_constraint_sw)
-
-    # def obs_lu_constraint_sw(fwm, i):
-    #     return fwm.xs_sw[i] == fwm.obs_lu_sw[i]
-    # fwm.c4 = Constraint(fwm.ids, rule=obs_lu_constraint_sw)
-
-    # def water_constraint(fwm, ff):
-    #     return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.water_constraints[ff]
-    # fwm.c2 = Constraint(fwm.farm_ids, rule=water_constraint)
-
-    def sw_constraint(fwm, ff):
-        return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.sw_constraints[ff]
-    fwm.c2 = Constraint(fwm.farm_ids, rule=sw_constraint)
-
-    def gw_constraint(fwm, ff):
-        return sum(fwm.xs_gw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.gw_constraints[ff]
-    fwm.c6 = Constraint(fwm.farm_ids, rule=gw_constraint)
-
-    def obs_lu_constraint_sum(fwm, i):
-        return fwm.xs_sw[i] + fwm.xs_gw[i] == fwm.xs_total[i]
-    fwm.c5 = Constraint(fwm.ids, rule=obs_lu_constraint_sum)
-
-    fwm.dual = Suffix(direction=Suffix.IMPORT)
-    #
-    # def water_constraint(fwm, ff):
-    #     return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.water_constraints[ff]
-    # fwm.c2 = Constraint(fwm.farm_ids, rule=water_constraint)
-
-    ## C.3. Solve
-    opt = SolverFactory("ipopt", solver_io='nl')
-    results = opt.solve(fwm, keepfiles=False, tee=True)
-    print(results.solver.termination_condition)
-    if results.solver.termination_condition != TerminationCondition.optimal:
-        break
-
-    ## C.1.d. Save duals:
-    # from pyomo.core import Constraint
-
-    obs_lu_duals_total = dict()
-    for c in fwm.component_objects(Constraint, active=True):
-        if str(c) == "c3":
-            cobject = getattr(fwm, str(c))
-            for index in cobject:
-                obs_lu_duals_total[index] = fwm.dual[cobject[index]]
-
-    # obs_lu_duals_sw = dict()
-    # for c in fwm.component_objects(Constraint, active=True):
-    #     if str(c) == "c4":
-    #         cobject = getattr(fwm, str(c))
-    #         for index in cobject:
-    #             obs_lu_duals_sw[index] = fwm.dual[cobject[index]]
-
-    # ## C.1.e. 1st stage result: Calculate alpha and gamma:
-    # # gamma1 = [((2. * a / b) if (b > 0.0) else 0.0) for a,b in zip(obs_lu_duals.values(),obs_lu.values())]
-    # gamma1 = [((a / b) if (b > 0.0) else 0.0) for a, b in zip(obs_lu_duals.values(), obs_lu.values())]
-    # alpha1 = [-(0.5 * a * b) for a, b in zip(gamma1, obs_lu.values())]
-    # print(alpha1)
-    # print("+++ alpha check: +++")
-    # print([(a, b) for a, b in zip(alphas, alpha1)])
-    # print("+++ gamma check: +++")
-    # print([(a, b) for a, b in zip(gammas, gamma1)])
-    # alphas = alpha1
-    # linear_term_sum=[p*y - c - wc*n - a for p,y,c,wc,n,a in zip(prices,yields,land_costs,sw_costs,water_nirs,alphas)]
-    # gammas = dict(enumerate(gamma1))
-    # net_prices = dict(enumerate(linear_term_sum))
-
-    ## C.1.e. 1st stage result: Calculate alpha and gamma:
-    # gamma1 = [((2. * a / b) if (b > 0.0) else 0.0) for a,b in zip(obs_lu_duals.values(),obs_lu.values())]
-    gamma1_total = [((2. * a / b) if (b > 0.0) else 0.0) for a, b in zip(obs_lu_duals_total.values(), obs_lu_total_subset.values())]
-    alpha1_total = [-(0.5 * a * b) for a, b in zip(gamma1_total, obs_lu_total_subset.values())]
-    print(alpha1_total)
-    print("+++ alpha check: +++")
-    print([(a, b) for a, b in zip(alphas_total, alpha1_total)])
-    print("+++ gamma check: +++")
-    print([(a, b) for a, b in zip(gammas_total, gamma1_total)])
-    alphas_total_subset = alpha1_total
-
-
-    keys_to_extract = crop_ids_by_farm[farm_no]
-    prices_subset = {key: prices[key] for key in keys_to_extract}
-    yields_subset = {key: yields[key] for key in keys_to_extract}
-    land_costs_subset = {key: land_costs[key] for key in keys_to_extract}
-    linear_term_sum_total_subset = [p*y - c - aland for p,y,c,aland in zip(prices_subset.values(),yields_subset.values(),land_costs_subset.values(),alphas_total_subset)]
-    gammas_total_subset = dict(enumerate(gamma1_total))
-    net_prices_total_subset = dict(enumerate(linear_term_sum_total_subset))
-
-    for i in range(10):
-        crop_id = crop_ids_by_farm[farm_no][i]
-        alphas_total_dict[crop_id] = alphas_total_subset[i]
-        gammas_total_dict[crop_id] = gammas_total_subset[i]
-        net_prices_total[crop_id] = net_prices_total_subset[i]
-
-
+keys_to_extract = crop_ids_by_farm[farm_no]
+prices_subset = {key: prices[key] for key in keys_to_extract}
+yields_subset = {key: yields[key] for key in keys_to_extract}
+land_costs_subset = {key: land_costs[key] for key in keys_to_extract}
+linear_term_sum_total = [p*y - c - aland for p,y,c,aland in zip(prices_subset.values(),yields_subset.values(),land_costs_subset.values(),alphas_total)]
+gammas_total = dict(enumerate(gamma1_total))
+net_prices_total = dict(enumerate(linear_term_sum_total))
 
 
 net_prices_total[keys_to_extract[0]] = net_prices_total.pop(0)
@@ -305,7 +288,6 @@ gammas_total[keys_to_extract[9]] = gammas_total.pop(9)
 ## C.2.a. Constructing model inputs:
 ##  (repetition to be safe - deepcopy does not work on PYOMO models)
 ## C.1. Constructing model inputs:
-farm_no = 36335
 fwm_s = ConcreteModel()
 # fwm_s.ids = Set(initialize=ids)
 fwm_s.ids = Set(initialize=crop_ids_by_farm[farm_no])
@@ -317,7 +299,7 @@ keys_to_extract = crop_ids_by_farm[farm_no]
 net_prices_total_subset = {key: net_prices_total[key] for key in keys_to_extract}
 net_prices_sw_subset = {key: net_prices_sw[key] for key in keys_to_extract}
 net_prices_gw_subset = {key: net_prices_gw[key] for key in keys_to_extract}
-gammas_total_subset = {key: gammas_total_dict[key] for key in keys_to_extract}
+gammas_total_subset = {key: gammas_total[key] for key in keys_to_extract}
 nirs_subset = {key: nirs[key] for key in keys_to_extract}
 
 # !JY! replace net_prices with zero value for gammas that equal to zero
@@ -336,10 +318,10 @@ fwm_s.gammas_total = Param(fwm_s.ids, initialize=gammas_total_subset, mutable=Tr
 # fwm_s.gammas_sw = Param(fwm_s.farm_ids, initialize=gammas_sw[0], mutable=True)
 fwm_s.land_constraints = Param(fwm_s.farm_ids, initialize=land_constraints_by_farm[farm_no], mutable=True)
 # fwm_s.water_constraints = Param(fwm_s.farm_ids, initialize=water_constraints_by_farm[0], mutable=True)
-# sw_constraints_by_farm_rev = sw_constraints_by_farm.copy()
-# sw_constraints_by_farm_rev.update((x, y*0.8) for x, y in sw_constraints_by_farm_rev.items())
-fwm_s.sw_constraints = Param(fwm_s.farm_ids, initialize=sw_constraints_by_farm[farm_no], mutable=True)
-with open('data_inputs/pickles/sw_gw_constr_20220321/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
+sw_constraints_by_farm_rev = sw_constraints_by_farm.copy()
+sw_constraints_by_farm_rev.update((x, y*0.8) for x, y in sw_constraints_by_farm_rev.items())
+fwm_s.sw_constraints = Param(fwm_s.farm_ids, initialize=sw_constraints_by_farm_rev[farm_no], mutable=True)
+with open('../data_inputs/pickles/sw_gw_constr_20220321/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
     gw_constraints_by_farm = pickle.load(fp, encoding='latin1')
 fwm_s.gw_constraints = Param(fwm_s.farm_ids, initialize=gw_constraints_by_farm[farm_no], mutable=True)
 fwm_s.xs_total = Var(fwm_s.ids, domain=NonNegativeReals, initialize=x_start_values)
@@ -392,7 +374,7 @@ result_xs_gw = dict(fwm_s.xs_gw.get_values())
 result_xs_total = dict(fwm_s.xs_total.get_values())
 
 # JY results stored as pickle file (results_xs.p). Start here and load pickle files.
-with open('result_xs.p', 'rb') as fp:
+with open('../result_xs.p', 'rb') as fp:
     result_xs = pickle.load(fp)
 
 # JY store results into a pandas dataframe

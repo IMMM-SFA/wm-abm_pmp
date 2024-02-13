@@ -1,4 +1,4 @@
-# pmp calibrated costs for gw only
+# pmp calibrated costs for both sw and gw
 
 import os
 import sys
@@ -21,7 +21,7 @@ import pdb
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20201028_GW.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
 #data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220311_GW.xlsx")
-data_file=pd.ExcelFile("data_inputs/MOSART_WM_PMP_inputs_20220323_GW.xlsx")
+data_file=pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_20220323_GW.xlsx")
 data_profit = data_file.parse("Profit")
 data_profit['area_irrigated'] = data_profit['area_irrigated'] * 1000
 data_profit['area_irrigated_gw'] = data_profit['area_irrigated_gw'] * 1000
@@ -46,15 +46,15 @@ crop_ids_by_farm_and_constraint={}
 land_constraints_by_farm={}
 water_constraints_by_farm={}
 #crop_ids_by_farm=dict(enumerate([np.where(data_profit["nldas"]==nldas_ids[i])[0].tolist() for i in range(53835)])) #JY this takes forever, find better way
-with open('data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
 # with open('data_inputs/max_land_constr_20201102.p', 'rb') as fp:
 #     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/water_constraints_by_farm_v2.p', 'rb') as fp:
+with open('../data_inputs/pickles/water_constraints_by_farm_v2.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp, encoding='latin1')
-with open('data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
 
 #Revise to account for removal of "Fodder_Herb category"
@@ -154,9 +154,9 @@ def obs_lu_constraint_total(fwm, i):
     return fwm.xs_total[i] == fwm.obs_lu_total[i]
 fwm.c3 = Constraint(fwm.ids, rule=obs_lu_constraint_total)
 
-# def obs_lu_constraint_sw(fwm, f):
-#     return sum(fwm.xs_sw[i] for i in fwm.crop_ids_by_farm[f]) == fwm.obs_lu_sw[f]
-# fwm.c4 = Constraint(fwm.farm_ids, rule=obs_lu_constraint_sw)
+def obs_lu_constraint_sw(fwm, f):
+    return sum(fwm.xs_sw[i] for i in fwm.crop_ids_by_farm[f]) == fwm.obs_lu_sw[f]
+fwm.c4 = Constraint(fwm.farm_ids, rule=obs_lu_constraint_sw)
 
 def obs_lu_constraint_gw(fwm, f):  # JY ADD
     return sum(fwm.xs_gw[i] for i in fwm.crop_ids_by_farm[f]) == fwm.obs_lu_gw[f]
@@ -170,9 +170,9 @@ fwm.c6 = Constraint(fwm.farm_ids, rule=obs_lu_constraint_gw)
 #     return sum(fwm.xs_sw[i]*fwm.nirs[i] for i in fwm.crop_ids_by_farm_and_constraint[ff]) <= fwm.water_constraints[ff]
 # fwm.c2 = Constraint(fwm.farm_ids, rule=water_constraint)
 
-def obs_lu_constraint_sum(fwm, i):
-    return fwm.xs_sw[i] + fwm.xs_gw[i] == fwm.xs_total[i]
-fwm.c5 = Constraint(fwm.ids, rule=obs_lu_constraint_sum)
+# def obs_lu_constraint_sum(fwm, i):
+#     return fwm.xs_sw[i] + fwm.xs_gw[i] == fwm.xs_total[i]
+# fwm.c5 = Constraint(fwm.ids, rule=obs_lu_constraint_sum)
 
 fwm.dual = Suffix(direction=Suffix.IMPORT)
 #
@@ -285,8 +285,8 @@ for n in [1]:
     # net_prices_gw_subset.update((x, y*2) for x, y in net_prices_gw_subset.items())  ### JY TEMP
     gammas_total_subset = {key: gammas_total[key] for key in ids_subset_sorted}
     nirs_subset = {key: nirs[key] for key in ids_subset_sorted}
-    #alphas_sw_subset = {key: alphas_sw[key] for key in farm_ids_subset}
-    #gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
+    alphas_sw_subset = {key: alphas_sw[key] for key in farm_ids_subset}
+    gammas_sw_subset = {key: gammas_sw[key] for key in farm_ids_subset}
     alphas_gw_subset = {key: alphas_gw[key] for key in farm_ids_subset}
     gammas_gw_subset = {key: gammas_gw[key] for key in farm_ids_subset}
     land_constraints_by_farm_subset = {key: land_constraints_by_farm[key] for key in farm_ids_subset}
@@ -311,8 +311,8 @@ for n in [1]:
     fwm_s.net_prices_total = Param(fwm_s.ids, initialize=net_prices_total_subset, mutable=True)
     fwm_s.net_prices_gw = Param(fwm_s.ids, initialize=net_prices_gw_subset, mutable=True)
     fwm_s.gammas_total = Param(fwm_s.ids, initialize=gammas_total_subset, mutable=True)
-    #fwm_s.alphas_sw = Param(fwm_s.farm_ids, initialize=alphas_sw_subset, mutable=True)
-    #fwm_s.gammas_sw = Param(fwm_s.farm_ids, initialize=gammas_sw_subset, mutable=True)
+    fwm_s.alphas_sw = Param(fwm_s.farm_ids, initialize=alphas_sw_subset, mutable=True)
+    fwm_s.gammas_sw = Param(fwm_s.farm_ids, initialize=gammas_sw_subset, mutable=True)
     fwm_s.alphas_gw = Param(fwm_s.farm_ids, initialize=alphas_gw_subset, mutable=True)
     fwm_s.gammas_gw = Param(fwm_s.farm_ids, initialize=gammas_gw_subset, mutable=True)
     fwm_s.land_constraints = Param(fwm_s.farm_ids, initialize=land_constraints_by_farm_subset, mutable=True)
@@ -331,7 +331,9 @@ for n in [1]:
         return 0.00001 * sum(sum((fwm_s.net_prices_total[h] * fwm_s.xs_total[h] - 0.5 * fwm_s.gammas_total[h] * fwm_s.xs_total[h] * fwm_s.xs_total[h]) for h in fwm_s.crop_ids_by_farm[f]) +
                    sum((fwm_s.net_prices_sw[i] * fwm_s.xs_sw[i]) for i in fwm_s.crop_ids_by_farm[f]) +
                    sum((fwm_s.net_prices_gw[g] * fwm_s.xs_gw[g]) for g in fwm_s.crop_ids_by_farm[f]) -
+                   (fwm_s.alphas_sw[f] * sum(fwm_s.xs_sw[s] for s in fwm_s.crop_ids_by_farm[f])) -
                    (fwm_s.alphas_gw[f] * sum(fwm_s.xs_gw[s] for s in fwm_s.crop_ids_by_farm[f])) -
+                   (0.5 * fwm_s.gammas_sw[f] * sum(fwm_s.xs_sw[t] for t in fwm_s.crop_ids_by_farm[f])) * sum(fwm_s.xs_sw[u] for u in fwm_s.crop_ids_by_farm[f]) -
                    (0.5 * fwm_s.gammas_gw[f] * sum(fwm_s.xs_gw[t] for t in fwm_s.crop_ids_by_farm[f])) * sum(fwm_s.xs_gw[u] for u in fwm_s.crop_ids_by_farm[f]) for f in fwm_s.farm_ids)  # JY double check this!
     fwm_s.obj_f = Objective(rule=obj_fun, sense=maximize)
 
@@ -360,7 +362,7 @@ for n in [1]:
     result_xs_total = dict(fwm_s.xs_total.get_values())
 
     # JY results stored as pickle file (results_xs.p). Start here and load pickle files.
-    with open('result_xs.p', 'rb') as fp:
+    with open('../result_xs.p', 'rb') as fp:
         result_xs = pickle.load(fp)
 
     # convert result_xs_sw to pandas dataframe and join to data_profit

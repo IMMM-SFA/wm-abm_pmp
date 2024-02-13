@@ -47,7 +47,7 @@ def calc_demand(year, month):
     else:
 
         #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
-        pic_input_dir = './local_debug/demand_input/'
+        pic_input_dir = '../local_debug/demand_input/'
 
         # loop through .nc files and extract data
         first = True

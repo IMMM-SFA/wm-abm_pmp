@@ -19,10 +19,10 @@ year = "1940"
 
 logging.info('Entering month 1 calculations: ' + month)
 
-with open('./data_inputs/pickles/nldas_ids.p', 'rb') as fp:
+with open('../data_inputs/pickles/nldas_ids.p', 'rb') as fp:
     nldas_ids = pickle.load(fp)
 
-nldas = pd.read_csv('./data_inputs/nldas.txt')
+nldas = pd.read_csv('../data_inputs/nldas.txt')
 
 #!!!JY
 
@@ -30,7 +30,7 @@ nldas = pd.read_csv('./data_inputs/nldas.txt')
 year_int = int(year)
 months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
-with open('./data_inputs/pickles/water_constraints_by_farm_pyt278.p', 'rb') as fp:
+with open('../data_inputs/pickles/water_constraints_by_farm_pyt278.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp)
 # water_constraints_by_farm = pd.read_pickle('/pic/projects/im3/wm/Jim/pmp_input_files/water_constraints_by_farm_v2.p')
 water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
@@ -38,20 +38,20 @@ water_constraints_by_farm = dict.fromkeys(water_constraints_by_farm, 9999999999)
 
 ## Read in Water Availability Files from MOSART-PMP
 if year_int<1950:  # If year is before 1950 (warm-up period), use the external baseline water demand files
-    water_constraints_by_farm = pd.read_csv('./data_inputs/hist_avail_bias_correction_20230103.csv') # Use baseline water demand data for warmup period
+    water_constraints_by_farm = pd.read_csv('../data_inputs/hist_avail_bias_correction_20230103.csv') # Use baseline water demand data for warmup period
     water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol_month']].reset_index()
     aggregation_functions={'sw_irrigation_vol_month': 'sum'}
     water_constraints_by_farm = water_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False, dropna=False).aggregate(aggregation_functions)
     water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol_month'].to_dict()
 elif year_int==1950:  # For first year of ABM, use baseline water demand data
-    water_constraints_by_farm = pd.read_csv('./data_inputs/hist_avail_bias_correction_20230103.csv') # Use baseline water demand data for warmup period
+    water_constraints_by_farm = pd.read_csv('../data_inputs/hist_avail_bias_correction_20230103.csv') # Use baseline water demand data for warmup period
     water_constraints_by_farm = water_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol_month']].reset_index()
     aggregation_functions={'sw_irrigation_vol_month': 'sum'}
     water_constraints_by_farm = water_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False, dropna=False).aggregate(aggregation_functions)
     water_constraints_by_farm = water_constraints_by_farm['sw_irrigation_vol_month'].to_dict()
 else:
     #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
-    pic_input_dir = './local_debug/demand_input/'
+    pic_input_dir = '../local_debug/demand_input/'
 
     # loop through .nc files and extract data
     first = True
@@ -144,7 +144,7 @@ else:
 logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
 
 ## Read in PMP calibration files
-data_file=pd.ExcelFile("./data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
+data_file=pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
 data_profit = data_file.parse("Profit")
 water_nirs=data_profit["nir_corrected"]
 nirs=dict(water_nirs)
@@ -154,11 +154,11 @@ logging.info('I have successfully loaded PMP calibration files for month, year: 
 ## C.1. Preparing model indices and constraints:
 ids = range(538350) # total number of crop and nldas ID combinations
 farm_ids = range(53835) # total number of farm agents / nldas IDs
-with open('./data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('./data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
-with open('./data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp)
 
 # Revise to account for removal of "Fodder_Herb category"
@@ -169,19 +169,19 @@ crop_ids_by_farm = crop_ids_by_farm_new
 crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
 # Load gammas, net prices, etc
-with open('./data_inputs/pickles/gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
     gammas_total = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
     net_prices_total = pickle.load(fp)
-with open('./data_inputs/pickles/alphas_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/alphas_total_dict_20220408_protocol2.p', 'rb') as fp:
     alphas_total = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_sw_20220323_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_sw_20220323_protocol2.p', 'rb') as fp:
     net_prices_sw = pickle.load(fp)
 # with open('./data_inputs/pickles/alphas_sw_20220303_protocol2.p', 'rb') as fp:
     # alphas_sw = pickle.load(fp)
 # with open('./data_inputs/pickles/gammas_sw_20220303_protocol2.p', 'rb') as fp:
     # gammas_sw = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_gw_20220323_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_gw_20220323_protocol2.p', 'rb') as fp:
     net_prices_gw = pickle.load(fp)
 
 x_start_values=dict(enumerate([0.0]*3))
@@ -346,7 +346,7 @@ results_pd = results_pd[['nldas', 'crop', 'xs_gw', 'xs_sw', 'xs_total', 'nir_cor
 # results_pd.to_csv('/pic/scratch/yoon644/csmruns/wm_abm_run/run/abm_results_' + str(year_int))
 
 # read a sample water demand input file
-file = './data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
+file = '../data_inputs/RCP8.5_GCAM_water_demand_1980_01_copy.nc'
 with netCDF4.Dataset(file, 'r') as nc:
     # for key, var in nc.variables.items():
     #     print(key, var.dimensions, var.shape, var.units, var.long_name, var._FillValue)
@@ -356,7 +356,7 @@ with netCDF4.Dataset(file, 'r') as nc:
     demand = nc['totalDemand'][:]
 
 # read NLDAS grid reference file
-df_grid = pd.read_csv('./data_inputs/NLDAS_Grid_Reference.csv')
+df_grid = pd.read_csv('../data_inputs/NLDAS_Grid_Reference.csv')
 
 df_grid = df_grid[['CENTERX', 'CENTERY', 'NLDAS_X', 'NLDAS_Y', 'NLDAS_ID']]
 

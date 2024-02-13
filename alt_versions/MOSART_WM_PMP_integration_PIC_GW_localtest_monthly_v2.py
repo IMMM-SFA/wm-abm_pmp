@@ -19,10 +19,10 @@ year = "1940"
 
 logging.info('Entering month 1 calculations: ' + month)
 
-with open('./data_inputs/pickles/nldas_ids.p', 'rb') as fp:
+with open('../data_inputs/pickles/nldas_ids.p', 'rb') as fp:
     nldas_ids = pickle.load(fp)
 
-nldas = pd.read_csv('./data_inputs/nldas.txt')
+nldas = pd.read_csv('../data_inputs/nldas.txt')
 
 #!!!JY
 
@@ -32,7 +32,7 @@ months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 
 ## Read in Water Availability Files from MOSART-PMP
 if year_int<=1940:  # If year is before 1950 (warm-up period), use the external baseline water demand files
-    sw_constraints_by_farm = pd.read_csv('./data_inputs/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
+    sw_constraints_by_farm = pd.read_csv('../data_inputs/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
     sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID', 'sw_irrigation_vol_month']].reset_index()
     aggregation_functions = {'sw_irrigation_vol_month': 'sum'}
     sw_constraints_by_farm = sw_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
@@ -40,7 +40,7 @@ if year_int<=1940:  # If year is before 1950 (warm-up period), use the external 
 elif year_int<1950:
     pass
 elif year_int==1950:  # For first year of ABM, use baseline water demand data
-    sw_constraints_by_farm = pd.read_csv('./data_inputs/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
+    sw_constraints_by_farm = pd.read_csv('../data_inputs/hist_avail_bias_correction_20230112.csv') # Use baseline water demand data for warmup period
     sw_constraints_by_farm = sw_constraints_by_farm[['NLDAS_ID','sw_irrigation_vol_month']].reset_index()
     aggregation_functions={'sw_irrigation_vol_month': 'sum'}
     sw_constraints_by_farm = sw_constraints_by_farm.groupby(['NLDAS_ID'], as_index=False).aggregate(aggregation_functions)
@@ -48,7 +48,7 @@ elif year_int==1950:  # For first year of ABM, use baseline water demand data
 else:
 
     #pic_output_dir = '/pic/scratch/yoon644/csmruns/jimtest2/run/'
-    pic_input_dir = './local_debug/demand_input/'
+    pic_input_dir = '../local_debug/demand_input/'
 
     # loop through .nc files and extract data
     first = True
@@ -141,7 +141,7 @@ else:
 logging.info('I have successfully loaded water availability files for month, year: ' + month + ' ' + year)
 
 ## Read in PMP calibration files
-data_file=pd.ExcelFile("./data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
+data_file=pd.ExcelFile("../data_inputs/MOSART_WM_PMP_inputs_20220223_GW.xlsx")
 data_profit = data_file.parse("Profit")
 water_nirs=data_profit["nir_corrected"]
 nirs=dict(water_nirs)
@@ -151,15 +151,15 @@ logging.info('I have successfully loaded PMP calibration files for month, year: 
 ## C.1. Preparing model indices and constraints:
 ids = range(538350) # total number of crop and nldas ID combinations
 farm_ids = range(53835) # total number of farm agents / nldas IDs
-with open('./data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
-with open('./data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
+with open('../data_inputs/pickles/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
-with open('./data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/max_land_constr_20220307_protocol2.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp)
 # with open('/pic/projects/im3/wm/Jim/pmp_input_files/sw_gw_constr_20220405/sw_calib_constraints_202203319_protocol2.p', 'rb') as fp:
 #     sw_constraints_by_farm = pickle.load(fp)
-with open('./data_inputs/pickles/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/gw_calib_constraints_20220401_protocol2.p', 'rb') as fp:
     gw_constraints_by_farm = pickle.load(fp)
 
 # Revise to account for removal of "Fodder_Herb category"
@@ -170,19 +170,19 @@ crop_ids_by_farm = crop_ids_by_farm_new
 crop_ids_by_farm_and_constraint = crop_ids_by_farm_new
 
 # Load gammas, net prices, etc
-with open('./data_inputs/pickles/gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/gammas_total_dict_20220408_protocol2.p', 'rb') as fp:
     gammas_total = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_total_dict_20220408_protocol2.p', 'rb') as fp:
     net_prices_total = pickle.load(fp)
-with open('./data_inputs/pickles/alphas_total_dict_20220408_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/alphas_total_dict_20220408_protocol2.p', 'rb') as fp:
     alphas_total = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_sw_20220323_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_sw_20220323_protocol2.p', 'rb') as fp:
     net_prices_sw = pickle.load(fp)
 # with open('/pic/projects/im3/wm/Jim/pmp_input_files/alphas_sw_20220323_protocol2.p', 'rb') as fp:
     # alphas_sw = pickle.load(fp)
 # with open('/pic/projects/im3/wm/Jim/pmp_input_files/gammas_sw_20220323_protocol2.p', 'rb') as fp:
     # gammas_sw = pickle.load(fp)
-with open('./data_inputs/pickles/net_prices_gw_20220323_protocol2.p', 'rb') as fp:
+with open('../data_inputs/pickles/net_prices_gw_20220323_protocol2.p', 'rb') as fp:
     net_prices_gw = pickle.load(fp)
 
 x_start_values=dict(enumerate([0.0]*3))
