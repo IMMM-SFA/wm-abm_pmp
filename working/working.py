@@ -232,7 +232,7 @@ list_ids = [16173,70008,123843,177678,231513,285348,339183,393018,446853,500688]
 for i in list_ids:
     print(net_prices[i])
 
-with open('../net_prices_corn2x.p', 'wb') as handle:
+with open('../archived/net_prices_corn2x.p', 'wb') as handle:
     pickle.dump(net_prices, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # Load in ABM csv results for cropped areas
@@ -251,7 +251,7 @@ water20_pivot.to_csv('C:\\Users\\yoon644\\OneDrive - PNNL\\Documents\\PyProjects
 with open('/data_inputs/gammas_new_20201006.p', 'rb') as fp:
     gammas_old = pickle.load(fp, encoding='latin1')
 
-with open('../alpha_new_20201013_protocol2.p', 'wb') as handle:
+with open('../archived/alpha_new_20201013_protocol2.p', 'wb') as handle:
     pickle.dump(alphas, handle, protocol=2)
 
 ds = xr.open_dataset('C:\\Users\\yoon644\\Desktop\\usgs.mosart.h0.2000-08.nc')

@@ -31,7 +31,7 @@ with open('../data_inputs/crop_ids_by_farm.p', 'rb') as fp:
     crop_ids_by_farm = pickle.load(fp)
 with open('../data_inputs/land_constraints_by_farm.p', 'rb') as fp:
     land_constraints_by_farm = pickle.load(fp)
-with open('../water_constraints_by_farm.p', 'rb') as fp:
+with open('../archived/water_constraints_by_farm.p', 'rb') as fp:
     water_constraints_by_farm = pickle.load(fp)
 with open('../data_inputs/crop_ids_by_farm_and_constraint.p', 'rb') as fp:
     crop_ids_by_farm_and_constraint = pickle.load(fp)
